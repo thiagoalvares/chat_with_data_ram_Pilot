@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="660" viewBox="0 0 1180 660" font-family="Arial, sans-serif">
+  <rect width="1180" height="660" fill="#FFFFFF"/>
+  <text x="590" y="36" text-anchor="middle" font-size="23" font-weight="bold" fill="#0A1628">Server Configuration — Single Box</text>
+  <text x="590" y="60" text-anchor="middle" font-size="14" fill="#4A5568">Both services on one Windows server; they talk over localhost</text>
+
+  <!-- Server container -->
+  <rect x="70" y="90" width="1040" height="360" rx="14" fill="#F5F6F8" stroke="#0A1628" stroke-width="2"/>
+  <text x="95" y="118" font-size="14" font-weight="bold" fill="#0A1628">Windows Server (domain-joined)</text>
+
+  <!-- IIS / .NET -->
+  <rect x="110" y="140" width="420" height="270" rx="10" fill="#FFFFFF" stroke="#1B3A6B" stroke-width="2"/>
+  <rect x="110" y="140" width="420" height="38" rx="10" fill="#0A1628"/>
+  <text x="320" y="165" text-anchor="middle" font-size="15" font-weight="bold" fill="#FFFFFF">IIS  →  .NET app (:5080)</text>
+  <text x="130" y="204" font-size="12.5" fill="#4A5568">• Serves the UI to users' browsers</text>
+  <text x="130" y="228" font-size="12.5" fill="#4A5568">• Windows Authentication (Active Directory)</text>
+  <text x="130" y="252" font-size="12.5" fill="#4A5568">• appsettings.Production.json</text>
+  <text x="130" y="276" font-size="12.5" fill="#4A5568">• PythonService:BaseUrl = http://localhost:8000</text>
+  <text x="130" y="300" font-size="12.5" fill="#4A5568">• ASPNETCORE_ENVIRONMENT = Production</text>
+  <text x="130" y="330" font-size="12" font-style="italic" fill="#8A9BB0">Published with `dotnet publish`, hosted by IIS</text>
+  <text x="130" y="352" font-size="12" font-style="italic" fill="#8A9BB0">(ASP.NET Core Hosting Bundle installed)</text>
+
+  <!-- Python service -->
+  <rect x="560" y="140" width="510" height="270" rx="10" fill="#FFFFFF" stroke="#00875A" stroke-width="2"/>
+  <rect x="560" y="140" width="510" height="38" rx="10" fill="#00875A"/>
+  <text x="815" y="165" text-anchor="middle" font-size="15" font-weight="bold" fill="#FFFFFF">Python service — waitress (:8000, localhost)</text>
+  <text x="580" y="204" font-size="12.5" fill="#4A5568">• serve.py — ONE process, ~16 threads</text>
+  <text x="580" y="228" font-size="12.5" fill="#4A5568">• STORAGE_BACKEND = memory  (all state in RAM)</text>
+  <text x="580" y="252" font-size="12.5" fill="#4A5568">• .env: LITELLM_API_KEY / LITELLM_API_BASE</text>
+  <text x="580" y="276" font-size="12.5" fill="#4A5568">• Registered as a Windows service via NSSM</text>
+  <text x="580" y="300" font-size="12.5" fill="#4A5568">   (auto-start on boot, auto-restart on failure)</text>
+  <text x="580" y="330" font-size="12" font-style="italic" fill="#8A9BB0">Python 3.10+ venv with requirements.txt</text>
+  <text x="580" y="352" font-size="12" font-style="italic" fill="#8A9BB0">Bind 127.0.0.1 — not exposed outside the box</text>
+
+  <!-- localhost arrow -->
+  <line x1="530" y1="275" x2="558" y2="275" stroke="#1B3A6B" stroke-width="2.5" marker-start="url(#am2)" marker-end="url(#am2)"/>
+  <defs><marker id="am2" markerWidth="9" markerHeight="9" refX="4" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#1B3A6B"/></marker></defs>
+  <text x="544" y="266" text-anchor="middle" font-size="10" fill="#4A5568">localhost</text>
+
+  <!-- outbound to gateway -->
+  <rect x="820" y="480" width="290" height="80" rx="10" fill="#FDF1E7" stroke="#D97706"/>
+  <text x="965" y="510" text-anchor="middle" font-size="13" font-weight="bold" fill="#0A1628">GA LiteLLM Gateway</text>
+  <text x="965" y="532" text-anchor="middle" font-size="11" fill="#4A5568">reached over the internal network</text>
+  <text x="965" y="550" text-anchor="middle" font-size="11" fill="#4A5568">(outbound HTTPS)</text>
+  <line x1="815" y1="410" x2="900" y2="478" stroke="#D97706" stroke-width="2" marker-end="url(#am2)"/>
+
+  <!-- Users -->
+  <rect x="70" y="500" width="240" height="70" rx="10" fill="#E8EDF5" stroke="#1B3A6B"/>
+  <text x="190" y="530" text-anchor="middle" font-size="13" font-weight="bold" fill="#0A1628">Users (browsers)</text>
+  <text x="190" y="550" text-anchor="middle" font-size="11" fill="#4A5568">reach IIS on the network</text>
+  <line x1="190" y1="500" x2="230" y2="412" stroke="#1B3A6B" stroke-width="2" marker-end="url(#am2)"/>
+
+  <!-- prereqs box -->
+  <rect x="340" y="480" width="450" height="120" rx="10" fill="#FFFFFF" stroke="#DDE1E9"/>
+  <text x="360" y="504" font-size="13" font-weight="bold" fill="#0A1628">Software to install on the server</text>
+  <text x="360" y="526" font-size="11.5" fill="#4A5568">• .NET 8 Hosting Bundle (IIS)      • Python 3.10+</text>
+  <text x="360" y="546" font-size="11.5" fill="#4A5568">• pip install -r requirements.txt (incl. waitress)</text>
+  <text x="360" y="566" font-size="11.5" fill="#4A5568">• NSSM (to run Python as a service)</text>
+  <text x="360" y="586" font-size="11.5" fill="#00875A">No SQL Server · no file share · no load balancer</text>
+</svg>

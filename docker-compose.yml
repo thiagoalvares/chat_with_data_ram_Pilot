@@ -1,0 +1,41 @@
+# Chat with Data — local two-service stack.
+#   docker compose up --build
+# Then open http://localhost:5080
+#
+# The .NET front end reaches the Python service by its compose service name
+# ("python") on the internal network — mirroring the production topology where
+# .NET forwards to the Python micro-service over the internal network.
+
+services:
+  python:
+    build: ./python-service
+    # Live LLM answers require the GA gateway — supply creds via python-service/.env
+    env_file:
+      - ./python-service/.env
+    environment:
+      # Single-server, in-RAM design (Option 1): everything is held in the
+      # Python process memory for fast responses. One container, one worker
+      # process (see the Dockerfile). A restart clears active sessions.
+      STORAGE_BACKEND: "memory"
+    ports:
+      - "8000:8000"   # exposed for convenience/debugging; .NET uses the internal name
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  dotnet:
+    build: ./dotnet-app
+    environment:
+      # Local Compose = Development env (auth disabled). QA/PROD set this to
+      # "QA"/"Production" to enable Windows Authentication.
+      ASPNETCORE_ENVIRONMENT: "Development"
+      # Override the Python base URL to use the compose service name.
+      PythonService__BaseUrl: "http://python:8000"
+      ASPNETCORE_URLS: "http://0.0.0.0:5080"
+    ports:
+      - "5080:5080"
+    depends_on:
+      python:
+        condition: service_started

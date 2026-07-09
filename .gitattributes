@@ -1,0 +1,11 @@
+# Protect binary files from EOL conversion on checkout (fixes "file is corrupt"
+# when cloning on Windows with core.autocrlf=true).
+*.docx binary
+*.pdf  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.xlsx binary
+*.xls  binary

@@ -1,0 +1,40 @@
+# ── Secrets / env ──────────────────────────────────────────────────────────
+.env
+.env.local
+*.key
+*.pem
+
+# ── Python ─────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# ── .NET ───────────────────────────────────────────────────────────────────
+bin/
+obj/
+*.user
+
+# ── Logs ───────────────────────────────────────────────────────────────────
+logs/
+*.log
+
+# ── Data files (uploads / test exports) ────────────────────────────────────
+*.csv
+*.CSV
+*.xlsx
+*.XLSX
+*.xls
+*.XLS
+
+# ── IDE / OS ───────────────────────────────────────────────────────────────
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local persisted session state (disk storage backend)
+local_state/

@@ -1,0 +1,1780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Chat with Data — .NET</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #FFFFFF;
+      --bg2:       #F5F6F8;
+      --bg3:       #ECEEF2;
+      --border:    #DDE1E9;
+      --border2:   #C8CED8;
+      --navy:      #0A1628;
+      --navy-mid:  #1B3A6B;
+      --navy-light:#E8EDF5;
+      --silver:    #8A9BB0;
+      --silver-lt: #B8C4D0;
+      --text:      #0A1628;
+      --text2:     #4A5568;
+      --text3:     #8A9BB0;
+      --success:   #00875A;
+      --error:     #C0392B;
+      --warn:      #D97706;
+      --inter:     'Inter', sans-serif;
+      --mono:      'IBM Plex Mono', monospace;
+      --shadow:    0 1px 3px rgba(10,22,40,0.08), 0 1px 2px rgba(10,22,40,0.04);
+      --shadow-md: 0 4px 12px rgba(10,22,40,0.10), 0 2px 4px rgba(10,22,40,0.06);
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--inter); font-size: 14px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+
+    /* ── Layout ── */
+    .layout { display: grid; grid-template-columns: 300px 1fr; height: 100vh; overflow: hidden; }
+
+    /* ── Sidebar ── */
+    .sidebar { background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+
+    /* Logo zone */
+    .logo-zone { padding: 1.2rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.9rem; flex-shrink: 0; }
+    .logo-container { width: 44px; height: 44px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); overflow: hidden; position: relative; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .logo-container img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .app-name { font-size: 0.9rem; font-weight: 700; color: var(--navy); letter-spacing: -0.01em; }
+    .app-tagline { font-size: 0.68rem; color: var(--silver); font-weight: 400; margin-top: 0.1rem; letter-spacing: 0.02em; }
+
+    /* Mode switcher */
+    .mode-section { padding: 1rem 1.2rem 0.6rem; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .section-label { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--silver); margin-bottom: 0.6rem; }
+    .mode-tabs { display: flex; background: var(--bg3); border-radius: 6px; padding: 3px; gap: 2px; }
+    .mode-tab { flex: 1; padding: 0.38rem 0.4rem; border: none; border-radius: 4px; background: transparent; font-family: var(--inter); font-size: 0.68rem; font-weight: 500; color: var(--silver); cursor: pointer; transition: all 0.15s; text-align: center; white-space: nowrap; }
+    .mode-tab.active { background: var(--navy); color: #fff; box-shadow: var(--shadow); }
+    .mode-tab:hover:not(.active) { color: var(--text2); background: var(--border); }
+
+    /* Sidebar body */
+    .sidebar-body { flex: 1; overflow-y: auto; padding: 1rem 1.2rem; }
+    .sidebar-section { margin-bottom: 1.4rem; }
+
+    /* Upload zones */
+    .upload-slot { margin-bottom: 0.8rem; }
+    .slot-label { font-size: 0.68rem; font-weight: 600; color: var(--text2); margin-bottom: 0.35rem; display: flex; align-items: center; justify-content: space-between; }
+    .slot-badge { font-size: 0.6rem; font-weight: 500; padding: 0.1rem 0.45rem; border-radius: 3px; background: var(--success); color: #fff; }
+    .slot-badge.empty { background: var(--bg3); color: var(--silver); }
+
+    .upload-zone { border: 1.5px dashed var(--border2); border-radius: 6px; padding: 0.9rem; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; position: relative; background: var(--bg); }
+    .upload-zone:hover, .upload-zone.drag-over { border-color: var(--navy-mid); background: var(--navy-light); }
+    .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .upload-icon { font-size: 1.1rem; margin-bottom: 0.25rem; }
+    .upload-text { font-size: 0.68rem; color: var(--silver); font-weight: 500; }
+    .upload-status { font-size: 0.68rem; padding: 0.3rem 0.6rem; border-radius: 4px; margin-top: 0.4rem; display: none; font-weight: 500; }
+    .upload-status.ok  { color: var(--success); background: rgba(0,135,90,0.08); display: block; }
+    .upload-status.err { color: var(--error);   background: rgba(192,57,43,0.08); display: block; }
+    .upload-status.warn { color: var(--warn);   background: rgba(217,119,6,0.08); display: block; }
+
+    /* Label input for variance */
+    .label-input { width: 100%; border: 1px solid var(--border); border-radius: 4px; padding: 0.35rem 0.6rem; font-family: var(--inter); font-size: 0.75rem; color: var(--text); background: var(--bg); outline: none; margin-bottom: 0.4rem; transition: border-color 0.15s; }
+    .label-input:focus { border-color: var(--navy-mid); }
+
+    /* Schema pills */
+    #schema-list, .schema-list { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+    .pill { font-family: var(--mono); font-size: 0.6rem; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; padding: 0.12rem 0.45rem; color: var(--text2); }
+    .pill em { color: var(--navy-mid); font-style: normal; font-weight: 500; }
+
+    /* Preview table */
+    .preview-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; max-height: 140px; overflow-y: auto; background: var(--bg); box-shadow: var(--shadow); }
+    .preview-wrap table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 0.6rem; }
+    .preview-wrap th { background: var(--navy); color: #fff; padding: 0.3rem 0.6rem; text-align: left; white-space: nowrap; position: sticky; top: 0; font-weight: 500; letter-spacing: 0.04em; }
+    .preview-wrap td { padding: 0.25rem 0.6rem; border-bottom: 1px solid var(--border); color: var(--text2); white-space: nowrap; max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+    .preview-wrap tr:nth-child(even) td { background: var(--bg2); }
+    .preview-wrap tr:last-child td { border-bottom: none; }
+
+    /* Options */
+    .debug-toggle { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.72rem; color: var(--text2); user-select: none; font-weight: 500; }
+    .toggle-track { width: 30px; height: 17px; background: var(--bg3); border: 1px solid var(--border2); border-radius: 9px; position: relative; transition: background 0.2s, border-color 0.2s; flex-shrink: 0; }
+    .toggle-track.on { background: var(--navy); border-color: var(--navy); }
+    .toggle-knob { width: 11px; height: 11px; background: var(--silver); border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: left 0.2s, background 0.2s; }
+    .toggle-track.on .toggle-knob { left: 15px; background: #fff; }
+
+    /* ── Main ── */
+    .main { display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+
+    .main-header { padding: 0.9rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; background: var(--bg); }
+    .header-left { display: flex; align-items: center; gap: 0.8rem; }
+    .main-title { font-size: 0.78rem; font-weight: 600; color: var(--text); }
+    .mode-badge { font-size: 0.6rem; font-weight: 600; padding: 0.18rem 0.6rem; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.08em; background: var(--navy); color: #fff; }
+    .mode-badge.variance  { background: var(--navy-mid); }
+    .mode-badge.msproject { background: #1a4a3a; }
+
+    .header-actions { display: flex; gap: 0.5rem; }
+    .btn-ghost { font-family: var(--inter); font-size: 0.68rem; font-weight: 500; color: var(--text3); background: none; border: 1px solid var(--border); border-radius: 4px; padding: 0.3rem 0.8rem; cursor: pointer; transition: all 0.15s; letter-spacing: 0.02em; }
+    .btn-ghost:hover { color: var(--text); border-color: var(--border2); background: var(--bg2); }
+
+    /* Chat */
+    .chat-body { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.2rem; }
+
+    .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--silver); gap: 0.8rem; text-align: center; }
+    .empty-icon { font-size: 2rem; opacity: 0.4; }
+    .empty-text { font-size: 0.8rem; font-weight: 500; color: var(--silver); }
+    .empty-sub  { font-size: 0.72rem; color: var(--silver-lt); max-width: 260px; }
+
+    /* Messages */
+    .msg { max-width: 780px; width: 100%; }
+    .msg-user      { align-self: flex-end; }
+    .msg-assistant { align-self: flex-start; }
+
+    .msg-label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.3rem; }
+    .msg-user .msg-label      { color: var(--silver); text-align: right; }
+    .msg-assistant .msg-label { color: var(--navy-mid); }
+
+    .msg-bubble { padding: 0.9rem 1.1rem; font-size: 0.84rem; line-height: 1.75; border-radius: 8px; }
+    .msg-user .msg-bubble      { background: var(--navy); color: #fff; border-radius: 8px 8px 2px 8px; box-shadow: var(--shadow); text-align: right; }
+    .msg-assistant .msg-bubble { background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--navy); border-radius: 2px 8px 8px 8px; color: var(--text); box-shadow: var(--shadow); }
+
+    /* Markdown table wrapper (for horizontal scroll) */
+    .msg-assistant .msg-bubble .table-wrapper { overflow-x: auto; margin-top: 0.7rem; border: 1px solid var(--border); border-radius: 4px; }
+
+    /* Markdown table */
+    .msg-assistant .msg-bubble table { border-collapse: collapse; margin-top: 0; font-family: var(--mono); font-size: 0.72rem; width: 100%; border-radius: 4px; overflow: hidden; }
+    .msg-assistant .msg-bubble th { background: var(--navy); color: #fff; padding: 0.35rem 0.75rem; text-align: left; font-weight: 600; letter-spacing: 0.04em; }
+    .msg-assistant .msg-bubble td { padding: 0.3rem 0.75rem; border-bottom: 1px solid var(--border); color: var(--text2); }
+    .msg-assistant .msg-bubble tr:nth-child(even) td { background: var(--bg2); }
+    .msg-assistant .msg-bubble tr:last-child td { border-bottom: none; }
+
+    /* Chart container */
+    .chart-container { margin-top: 1rem; padding: 1rem; background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; position: relative; }
+    .chart-title { font-size: 0.75rem; font-weight: 600; color: var(--navy); margin-bottom: 0.75rem; }
+    .chart-canvas-wrap { position: relative; height: 220px; }
+    .chart-actions { display: flex; justify-content: flex-end; margin-top: 0.6rem; }
+    .btn-export { font-family: var(--inter); font-size: 0.62rem; font-weight: 500; color: var(--silver); background: none; border: 1px solid var(--border); border-radius: 3px; padding: 0.2rem 0.65rem; cursor: pointer; transition: all 0.15s; letter-spacing: 0.04em; }
+    .btn-export:hover { color: var(--navy); border-color: var(--navy); }
+
+    /* Excel export */
+    .export-actions { display: flex; justify-content: flex-end; margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px solid var(--border); }
+    .btn-export-excel { font-family: var(--inter); font-size: 0.62rem; font-weight: 600; color: #fff; background: #1b7f37; border: none; border-radius: 3px; padding: 0.3rem 0.8rem; cursor: pointer; transition: all 0.15s; letter-spacing: 0.04em; }
+    .btn-export-excel:hover { background: #156b2f; box-shadow: 0 2px 4px rgba(27,127,55,0.2); }
+
+    /* Debug export */
+    .btn-export-debug { font-family: var(--inter); font-size: 0.62rem; font-weight: 600; color: #fff; background: #2563eb; border: none; border-radius: 3px; padding: 0.3rem 0.8rem; cursor: pointer; transition: all 0.15s; letter-spacing: 0.04em; }
+    .btn-export-debug:hover { background: #1d4ed8; box-shadow: 0 2px 4px rgba(37,99,235,0.2); }
+
+    /* Debug */
+    .debug-block { margin-top: 0.6rem; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+    .debug-summary { font-family: var(--mono); font-size: 0.62rem; color: var(--silver); padding: 0.3rem 0.7rem; cursor: pointer; background: var(--bg2); letter-spacing: 0.06em; text-transform: uppercase; list-style: none; user-select: none; font-weight: 500; }
+    .debug-summary:hover { color: var(--text2); }
+    .debug-content { padding: 0.7rem; display: flex; flex-direction: column; gap: 0.5rem; background: var(--bg); }
+    .debug-item-label { font-family: var(--mono); font-size: 0.58rem; color: var(--navy-mid); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.15rem; font-weight: 600; }
+    .debug-code { font-family: var(--mono); font-size: 0.68rem; color: var(--text2); white-space: pre-wrap; background: var(--bg2); border: 1px solid var(--border); border-radius: 3px; padding: 0.5rem 0.7rem; }
+
+    /* Thinking */
+    .thinking { align-self: flex-start; display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1rem; background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--navy); border-radius: 2px 6px 6px 6px; font-size: 0.72rem; color: var(--silver); font-weight: 500; box-shadow: var(--shadow); }
+    .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--navy); opacity: 0.3; animation: pulse 1.2s ease-in-out infinite; }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes pulse { 0%,80%,100% { opacity: 0.2; transform: scale(0.8); } 40% { opacity: 0.8; transform: scale(1); } }
+
+    /* Input */
+    .input-area { flex-shrink: 0; padding: 1rem 1.5rem 1.2rem; border-top: 1px solid var(--border); background: var(--bg2); }
+    .input-row { display: flex; gap: 0.6rem; align-items: flex-end; }
+    textarea { flex: 1; background: var(--bg); border: 1.5px solid var(--border); border-radius: 6px; color: var(--text); font-family: var(--inter); font-size: 0.84rem; padding: 0.7rem 0.95rem; resize: none; outline: none; transition: border-color 0.15s, box-shadow 0.15s; line-height: 1.5; min-height: 44px; max-height: 120px; width: 100%; box-shadow: var(--shadow); }
+    textarea:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(10,22,40,0.06); }
+    textarea::placeholder { color: var(--silver-lt); }
+    .send-btn { background: var(--navy); color: #fff; border: none; border-radius: 6px; font-family: var(--inter); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; padding: 0 1.4rem; height: 44px; cursor: pointer; transition: background 0.15s, box-shadow 0.15s; white-space: nowrap; flex-shrink: 0; box-shadow: var(--shadow); }
+    .send-btn:hover  { background: var(--navy-mid); box-shadow: var(--shadow-md); }
+    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+    .input-hint { font-size: 0.6rem; color: var(--silver-lt); margin-top: 0.4rem; font-weight: 400; }
+
+    /* Monte Carlo slider */
+    .mc-slider { width: 100%; accent-color: var(--navy); margin: 0.2rem 0 0.5rem; }
+    .mc-label  { font-family: var(--mono); font-size: 0.68rem; color: var(--text2);
+                 display: flex; justify-content: space-between; margin-bottom: 0.15rem; }
+    .mc-label span { color: var(--navy); font-weight: 600; }
+    .narrative-badge { font-size: 0.6rem; color: var(--silver); font-style: italic; margin-left: 0.3rem; }
+
+    /* IMS Health Check */
+    .ims-results-table { width: 100%; border-collapse: collapse; font-size: 0.72rem; margin-top: 0.8rem; }
+    .ims-results-table th { background: var(--navy); color: #fff; padding: 0.4rem 0.6rem; text-align: left; font-size: 0.65rem; letter-spacing: 0.06em; text-transform: uppercase; position: sticky; top: 0; }
+    .ims-results-table td { padding: 0.35rem 0.6rem; border-bottom: 1px solid var(--border); color: var(--text2); vertical-align: top; }
+    .ims-results-table tr:hover td { background: var(--navy-light); }
+    .ims-status-badge { display: inline-block; font-size: 0.6rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 3px; letter-spacing: 0.06em; color: #fff; }
+    .ims-status-PASS   { background: var(--success); }
+    .ims-status-FAIL   { background: var(--error); }
+    .ims-status-WARN   { background: var(--warn); }
+    .ims-status-NA     { background: var(--silver); }
+    .ims-status-MANUAL { background: var(--navy-mid); }
+    .ims-status-FUTURE { background: var(--border2); color: var(--text); }
+    .ims-summary-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.8rem; }
+    .ims-summary-card { flex: 1; min-width: 60px; background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; padding: 0.5rem 0.6rem; text-align: center; }
+    .ims-summary-card .val { font-size: 1.4rem; font-weight: 700; color: var(--navy); font-family: var(--mono); }
+    .ims-summary-card .lbl { font-size: 0.58rem; color: var(--silver); text-transform: uppercase; letter-spacing: 0.08em; }
+    .ims-summary-card.fail .val { color: var(--error); }
+    .ims-summary-card.pass .val { color: var(--success); }
+    .ims-summary-card.warn .val { color: var(--warn); }
+    .ims-results-wrap { max-height: 55vh; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; }
+    .ims-run-area { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-top: 0.5rem; }
+    .mode-badge.ims { background: #2d4a7a; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--silver-lt); }
+
+    /* Mode panels */
+    .mode-panel { display: none; }
+    .mode-panel.active { display: block; }
+
+    /* Sheet selector modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(10,22,40,0.4); display: none; align-items: center; justify-content: center; z-index: 100; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; min-width: 300px; box-shadow: var(--shadow-md); }
+    .modal-title { font-size: 0.9rem; font-weight: 600; color: var(--navy); margin-bottom: 0.4rem; }
+    .modal-sub { font-size: 0.72rem; color: var(--silver); margin-bottom: 1rem; }
+    .sheet-btn { display: block; width: 100%; text-align: left; padding: 0.55rem 0.8rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg2); font-family: var(--inter); font-size: 0.78rem; color: var(--text); cursor: pointer; margin-bottom: 0.4rem; transition: all 0.15s; }
+    .sheet-btn:hover { border-color: var(--navy); background: var(--navy-light); }
+    .modal-cancel { font-size: 0.7rem; color: var(--silver); cursor: pointer; text-align: center; margin-top: 0.5rem; display: block; }
+    .modal-cancel:hover { color: var(--text2); }
+
+    /* ── v2 additions ─────────────────────────────────────────────────────── */
+    /* Suggested question chips */
+    .chips-bar { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0.2rem 0 0.6rem; }
+    .chip { font-family: var(--inter); font-size: 0.68rem; font-weight: 500; padding: 0.32rem 0.75rem; border-radius: 20px; border: 1px solid var(--border2); background: var(--bg); color: var(--text2); cursor: pointer; transition: all 0.12s; }
+    .chip:hover { border-color: var(--navy); color: var(--navy); background: var(--navy-light); }
+
+    /* Anomaly nudge */
+    .nudge { display: flex; gap: 0.5rem; align-items: flex-start; background: #FDF6EC; border: 1px solid #F3D6B3; border-radius: 6px; padding: 0.55rem 0.75rem; font-size: 0.7rem; color: #8a5a10; margin-bottom: 0.7rem; }
+    .nudge .nudge-x { margin-left: auto; cursor: pointer; color: #b98a3e; font-weight: 700; background: none; border: none; font-size: 0.8rem; }
+
+    /* Data profile card */
+    .profile-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.7rem; font-size: 0.68rem; color: var(--text2); line-height: 1.75; }
+    .profile-card b { color: var(--text); font-weight: 600; }
+    .slot-hint { font-size: 0.62rem; color: var(--silver); margin-top: 0.2rem; }
+
+    /* Message action icons + refine buttons */
+    .msg-actions { display: flex; gap: 0.55rem; margin-top: 0.45rem; }
+    .msg-actions button { background: none; border: none; cursor: pointer; font-size: 0.66rem; color: var(--silver); font-family: var(--inter); padding: 0; transition: color 0.12s; }
+    .msg-actions button:hover { color: var(--navy); }
+    .msg-actions button.pinned { color: #D97706; }
+    .btn-mini { font-family: var(--inter); font-size: 0.62rem; font-weight: 500; color: var(--text2); background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; padding: 0.22rem 0.6rem; cursor: pointer; transition: all 0.12s; }
+    .btn-mini:hover { border-color: var(--navy); color: var(--navy); }
+
+    /* Chart type switcher */
+    .chart-type-btns { display: inline-flex; gap: 2px; background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; padding: 2px; margin-right: 0.4rem; }
+    .chart-type-btns button { border: none; background: transparent; font-size: 0.62rem; padding: 0.15rem 0.5rem; cursor: pointer; color: var(--silver); border-radius: 3px; font-family: var(--inter); }
+    .chart-type-btns button.active { background: var(--navy); color: #fff; }
+
+    /* Header view tabs + buttons */
+    .view-tabs { display: flex; gap: 2px; background: var(--bg3); border-radius: 6px; padding: 2px; margin-right: 0.6rem; }
+    .view-tab { border: none; border-radius: 4px; background: transparent; font-family: var(--inter); font-size: 0.68rem; font-weight: 500; color: var(--silver); cursor: pointer; padding: 0.3rem 0.7rem; }
+    .view-tab.active { background: var(--navy); color: #fff; }
+    .btn-header { font-family: var(--inter); font-size: 0.68rem; font-weight: 600; color: #fff; background: var(--success); border: none; border-radius: 4px; padding: 0.4rem 0.8rem; cursor: pointer; }
+    .btn-header:hover { filter: brightness(1.08); }
+    .icon-btn { background: none; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; font-size: 0.85rem; padding: 0.25rem 0.5rem; color: var(--text2); transition: all 0.12s; }
+    .icon-btn:hover { border-color: var(--navy); color: var(--navy); }
+
+    /* Dashboard */
+    .dash-body { flex: 1; overflow-y: auto; padding: 1.2rem 1.6rem; display: none; }
+    .dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.9rem; }
+    .dash-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.9rem; display: flex; flex-direction: column; box-shadow: var(--shadow); }
+    .dash-q { font-size: 0.72rem; font-weight: 600; color: var(--text); line-height: 1.4; display: flex; gap: 0.4rem; }
+    .dash-q .unpin { margin-left: auto; background: none; border: none; cursor: pointer; color: #D97706; font-size: 0.8rem; }
+    .dash-a { font-size: 0.68rem; color: var(--text2); margin-top: 0.4rem; line-height: 1.5; max-height: 5.5em; overflow: hidden; }
+    .dash-chart { position: relative; height: 150px; margin-top: 0.5rem; }
+    .dash-foot { font-size: 0.6rem; color: var(--silver); margin-top: auto; padding-top: 0.55rem; border-top: 1px solid var(--border); }
+    .dash-empty { text-align: center; color: var(--silver); font-size: 0.75rem; padding: 3rem 1rem; }
+
+    /* History popover */
+    .hist-wrap { position: relative; }
+    .hist-pop { position: absolute; bottom: 110%; left: 0; min-width: 260px; max-width: 380px; background: var(--bg); border: 1px solid var(--border2); border-radius: 6px; box-shadow: var(--shadow-md); padding: 0.35rem; display: none; z-index: 60; }
+    .hist-pop.open { display: block; }
+    .hist-item { font-size: 0.68rem; color: var(--text2); padding: 0.35rem 0.55rem; border-radius: 4px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hist-item:hover { background: var(--navy-light); color: var(--navy); }
+    .hist-none { font-size: 0.66rem; color: var(--silver); padding: 0.4rem 0.55rem; }
+
+    /* ── Dark mode ─────────────────────────────────────────────────────────── */
+    html[data-theme="dark"] {
+      --bg:        #121A26;
+      --bg2:       #0D141E;
+      --bg3:       #1B2634;
+      --border:    #263346;
+      --border2:   #38485F;
+      --navy:      #3D65A8;
+      --navy-mid:  #6E93CC;
+      --navy-light:#1C2A3E;
+      --silver:    #7C8AA0;
+      --silver-lt: #5A6A80;
+      --text:      #E6EBF2;
+      --text2:     #B9C3D2;
+      --text3:     #7C8AA0;
+      --shadow:    0 1px 3px rgba(0,0,0,0.4);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    html[data-theme="dark"] .app-name, html[data-theme="dark"] .main-title, html[data-theme="dark"] .modal-title { color: var(--text); }
+    html[data-theme="dark"] .nudge { background: #2A2314; border-color: #4A3B1C; color: #D9A94E; }
+    html[data-theme="dark"] .nudge .nudge-x { color: #A98A4E; }
+    html[data-theme="dark"] .logo-container { background: #E8EDF5; }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+
+    <!-- Logo + App name -->
+    <div class="logo-zone">
+      <div class="logo-container">
+        <img src="/images/ga_logo.png" alt="Company logo"/>
+      </div>
+      <div>
+        <div class="app-name">Chat with Data</div>
+        <div class="app-tagline">AI-Powered Data Analysis</div>
+      </div>
+    </div>
+
+    <!-- Mode switcher -->
+    <div class="mode-section">
+      <div class="section-label">Analysis Mode</div>
+      <div class="mode-tabs">
+        <button class="mode-tab active" data-mode="standard"  onclick="switchMode('standard')">Standard</button>
+        <button class="mode-tab"        data-mode="variance"  onclick="switchMode('variance')">Variance</button>
+      </div>
+    </div>
+
+    <!-- Sidebar panels -->
+    <div class="sidebar-body">
+
+      <!-- Standard mode -->
+      <div class="mode-panel active" id="panel-standard">
+        <div class="sidebar-section">
+          <div class="section-label">Data File</div>
+          <div class="upload-slot">
+            <div class="upload-zone" id="zone-standard">
+              <input type="file" id="file-standard" accept=".csv,.xlsx,.xls"/>
+              <div class="upload-icon">📂</div>
+              <div class="upload-text">CSV or XLSX — drop or click</div>
+            </div>
+            <div class="upload-status" id="status-standard"></div>
+          </div>
+        </div>
+        <div class="sidebar-section" id="schema-section" style="display:none">
+          <div class="section-label">Schema</div>
+          <div id="schema-list" class="schema-list"></div>
+        </div>
+        <div class="sidebar-section" id="profile-section" style="display:none">
+          <div class="section-label">Data Profile</div>
+          <div class="profile-card" id="profile-card"></div>
+        </div>
+        <div class="sidebar-section" id="preview-section" style="display:none">
+          <div class="section-label">Preview</div>
+          <div class="preview-wrap"><table id="preview-table"></table></div>
+        </div>
+      </div>
+
+      <!-- Variance mode -->
+      <div class="mode-panel" id="panel-variance">
+        <div class="sidebar-section">
+          <div class="section-label">Dataset A — Baseline</div>
+          <div class="upload-slot">
+            <input class="label-input" id="label-a" type="text" placeholder="Label (e.g. Budget, Jan 2025)" value="Baseline"/>
+            <div class="slot-hint" id="hint-a" style="display:none"></div>
+            <div class="upload-zone" id="zone-a">
+              <input type="file" id="file-a" accept=".csv,.xlsx,.xls"/>
+              <div class="upload-icon">📂</div>
+              <div class="upload-text">CSV or XLSX</div>
+            </div>
+            <div class="upload-status" id="status-a"></div>
+          </div>
+        </div>
+        <div class="sidebar-section">
+          <div class="section-label">Dataset B — Current</div>
+          <div class="upload-slot">
+            <input class="label-input" id="label-b" type="text" placeholder="Label (e.g. Actuals, Feb 2025)" value="Current"/>
+            <div class="slot-hint" id="hint-b" style="display:none"></div>
+            <div class="upload-zone" id="zone-b">
+              <input type="file" id="file-b" accept=".csv,.xlsx,.xls"/>
+              <div class="upload-icon">📂</div>
+              <div class="upload-text">CSV or XLSX</div>
+            </div>
+            <div class="upload-status" id="status-b"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Options (always visible) -->
+      <div class="sidebar-section">
+        <div class="section-label">Options</div>
+        <label class="debug-toggle" id="debug-toggle">
+          <div class="toggle-track" id="toggle-track"><div class="toggle-knob"></div></div>
+          Show Query and Calculations
+        </label>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <main class="main">
+    <div class="main-header">
+      <div class="header-left">
+        <div class="main-title" id="main-title">No data loaded</div>
+        <div class="mode-badge" id="mode-badge">Standard</div>
+      </div>
+      <div class="header-actions">
+        <div class="view-tabs">
+          <button class="view-tab active" id="view-tab-chat" onclick="showView('chat')">Chat</button>
+          <button class="view-tab" id="view-tab-dash" onclick="showView('dashboard')">Dashboard</button>
+        </div>
+        <button class="btn-header" onclick="exportConversation()" title="Export this conversation to a Word document">↓ Export Report</button>
+        <button class="icon-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle dark mode">◐</button>
+        <button class="btn-ghost" onclick="clearChat()">Clear Chat</button>
+      </div>
+    </div>
+
+    <div class="chat-body" id="chat-body">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">◈</div>
+        <div class="empty-text">Upload a file to begin</div>
+        <div class="empty-sub">Select a mode and upload your data to start asking questions</div>
+      </div>
+    </div>
+
+    <div class="dash-body" id="dash-body">
+      <div class="dash-grid" id="dash-grid"></div>
+      <div class="dash-empty" id="dash-empty">Nothing pinned yet — use the ⚲ Pin button on any answer to add it here.<br>
+        <span style="font-size:0.65rem">Pins are snapshots of this session. Export Report saves them for good.</span></div>
+    </div>
+
+    <div class="input-area" id="input-area">
+      <div class="input-row">
+        <div class="hist-wrap">
+          <button class="icon-btn" id="hist-btn" onclick="toggleHistory()" title="Recent questions">↺</button>
+          <div class="hist-pop" id="hist-pop"></div>
+        </div>
+        <textarea id="question-input" placeholder="Ask a question about your data..." rows="1" disabled></textarea>
+        <button class="send-btn" id="send-btn" onclick="sendQuestion()" disabled>Send</button>
+      </div>
+      <div class="input-hint" id="input-hint">Enter to send · Shift+Enter for new line</div>
+    </div>
+  </main>
+</div>
+
+<!-- Sheet selection modal -->
+<div class="modal-overlay" id="sheet-modal">
+  <div class="modal">
+    <div class="modal-title">Select Sheet</div>
+    <div class="modal-sub">This file has multiple sheets. Which one would you like to load?</div>
+    <div id="sheet-buttons"></div>
+    <span class="modal-cancel" onclick="closeSheetModal()">Cancel</span>
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let currentMode    = 'standard';
+let debugEnabled   = false;
+let dataLoaded     = false;
+let isThinking     = false;
+let chartInstances = {};
+let pendingSheet   = null; // {slot, file, statusEl, zoneEl}
+let mspLoaded      = { tasks: false, resources: false, assignments: false, earned_value: false };
+
+// ── v2 state ──────────────────────────────────────────────────────────────────
+// Per-tab transcripts: the screen keeps each tab's conversation until the user
+// clears it. Entries: {id, role, content, debugItems, chartSpec, question}
+let transcripts     = { standard: [], variance: [] };
+let questionHistory = { standard: [], variance: [] };   // for the ↺ dropdown
+let modeSuggestions = { standard: [], variance: [] };   // starter chips
+let modeAnomalies   = { standard: [], variance: [] };   // "did you notice?"
+let nudgeDismissed  = { standard: false, variance: false };
+let modeTitles      = { standard: 'No data loaded', variance: 'No data loaded' };
+let modeMeta        = { standard: '', variance: '' };
+let modeReady       = { standard: false, variance: false };
+let varLoaded       = { a: false, b: false };
+let pinned          = [];      // dashboard snapshots {id, question, answer, chartSpec, file, ts}
+let chartSpecs      = {};      // canvasId -> spec (for the type switcher + export)
+let dashCharts      = [];      // live Chart instances on the dashboard
+let msgCounter      = 0;
+let currentView     = 'chat';
+
+const MODE_LABELS  = { standard: 'Standard', variance: 'Variance', msproject: 'MS Project', ims: 'IMS Health Check' };
+const MSP_SLOTS    = [
+  { key: 'tasks',        label: 'Tasks' },
+  { key: 'resources',    label: 'Resources' },
+  { key: 'assignments',  label: 'Assignments' },
+  { key: 'earned_value', label: 'Earned Value' },
+];
+
+// Chart color palette — navy/silver corporate
+const CHART_COLORS = [
+  '#0A1628', '#1B3A6B', '#8A9BB0', '#C8CED8',
+  '#00875A', '#D97706', '#2563EB', '#7C3AED',
+];
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  // MS Project / IMS init removed — this build is Standard + Variance only.
+  setupTextarea();
+  setupLogoUpload();
+  setupDragDrop('zone-standard', 'file-standard');
+  setupDragDrop('zone-a',        'file-a');
+  setupDragDrop('zone-b',        'file-b');
+
+  document.getElementById('file-standard').addEventListener('change', e => {
+    if (e.target.files[0]) handleUpload(e.target.files[0], 'standard', 'status-standard', 'zone-standard');
+  });
+  document.getElementById('file-a').addEventListener('change', e => {
+    if (e.target.files[0]) handleUpload(e.target.files[0], 'variance/a', 'status-a', 'zone-a', document.getElementById('label-a').value || 'File A');
+  });
+  document.getElementById('file-b').addEventListener('change', e => {
+    if (e.target.files[0]) handleUpload(e.target.files[0], 'variance/b', 'status-b', 'zone-b', document.getElementById('label-b').value || 'File B');
+  });
+
+  document.getElementById('debug-toggle').addEventListener('click', () => {
+    debugEnabled = !debugEnabled;
+    document.getElementById('toggle-track').classList.toggle('on', debugEnabled);
+    renderTranscript(currentMode);
+  });
+
+  // v2: restore theme, close history popover on outside click
+  applyTheme(localStorage.getItem('cwd_theme') || 'light');
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.hist-wrap')) document.getElementById('hist-pop').classList.remove('open');
+  });
+});
+
+// ── MS Project slot builder ───────────────────────────────────────────────────
+function buildMspSlots() {
+  const container = document.getElementById('msp-slots');
+  MSP_SLOTS.forEach(slot => {
+    const fileId   = `file-msp-${slot.key}`;
+    const statusId = `status-msp-${slot.key}`;
+    const zoneId   = `zone-msp-${slot.key}`;
+
+    container.innerHTML += `
+      <div class="upload-slot">
+        <div class="slot-label">
+          ${slot.label}
+          <span class="slot-badge empty" id="badge-${slot.key}">Optional</span>
+        </div>
+        <div class="upload-zone" id="${zoneId}">
+          <input type="file" id="${fileId}" accept=".csv,.xlsx,.xls"/>
+          <div class="upload-icon">📂</div>
+          <div class="upload-text">CSV or XLSX</div>
+        </div>
+        <div class="upload-status" id="${statusId}"></div>
+      </div>`;
+  });
+
+  // Wire up after DOM is updated
+  setTimeout(() => {
+    MSP_SLOTS.forEach(slot => {
+      const fileId   = `file-msp-${slot.key}`;
+      const statusId = `status-msp-${slot.key}`;
+      const zoneId   = `zone-msp-${slot.key}`;
+      setupDragDrop(zoneId, fileId);
+      document.getElementById(fileId).addEventListener('change', e => {
+        if (e.target.files[0]) handleUpload(e.target.files[0], `msproject/${slot.key}`, statusId, zoneId);
+      });
+    });
+  }, 0);
+}
+
+// ── File upload ───────────────────────────────────────────────────────────────
+async function handleUpload(file, endpoint, statusId, zoneId, label = null) {
+  const statusEl = document.getElementById(statusId);
+  setStatus(statusEl, 'Loading...', '');
+
+  const fd = new FormData();
+  fd.append('file', file);
+  if (label) fd.append('label', label);
+
+  try {
+    const r = await fetch(`/upload/${endpoint}`, { method: 'POST', body: fd });
+    const d = await r.json();
+
+    if (d.error) { setStatus(statusEl, '✗ ' + d.error, 'err'); return; }
+
+    // Multi-sheet Excel — show picker
+    if (d.needs_sheet_selection) {
+      pendingSheet = { endpoint, file, statusEl, zoneId, label };
+      showSheetModal(d.sheets);
+      return;
+    }
+
+    onUploadSuccess(d, endpoint, statusEl, file.name);
+
+  } catch (e) {
+    setStatus(statusEl, '✗ Upload failed: ' + e.message, 'err');
+  }
+}
+
+function onUploadSuccess(d, endpoint, statusEl, filename) {
+  let msg = `✓ ${d.rows} rows · ${d.cols} cols`;
+  if (d.encoding) msg += ` · ${d.encoding}`;
+  setStatus(statusEl, msg, 'ok');
+
+  if (d.warnings && d.warnings.length) {
+    d.warnings.forEach(w => setStatus(statusEl, '⚠ ' + w, 'warn'));
+  }
+
+  const mode = endpoint === 'standard' ? 'standard' : 'variance';
+
+  // A new file starts a fresh conversation for THIS tab only (matches server).
+  transcripts[mode]    = [];
+  nudgeDismissed[mode] = false;
+  modeSuggestions[mode] = d.suggestions || [];
+  modeAnomalies[mode]   = d.anomalies || [];
+  modeMeta[mode]        = `${Number(d.rows).toLocaleString()} rows x ${d.cols} columns`;
+
+  // Standard mode schema + preview + profile card
+  if (endpoint === 'standard') {
+    modeReady.standard = true;
+    modeTitles.standard = filename;
+    renderSchema(d.columns);
+    renderPreview(d.columns, d.preview);
+    renderProfile(d.profile);
+  } else {
+    // Variance: track slots, auto-detect a date from the filename for the label
+    const slot = endpoint.split('/')[1];   // 'a' or 'b'
+    varLoaded[slot] = true;
+    modeReady.variance = varLoaded.a && varLoaded.b;
+    const detected = detectDateFromFilename(filename);
+    const hintEl = document.getElementById(`hint-${slot}`);
+    if (detected && hintEl) { hintEl.textContent = `detected: ${detected}`; hintEl.style.display = 'block'; }
+    const labelEl = document.getElementById(`label-${slot}`);
+    const defaults = ['Baseline', 'Current', 'File A', 'File B', ''];
+    if (detected && labelEl && defaults.includes(labelEl.value.trim())) {
+      labelEl.value = `${slot === 'a' ? 'Baseline' : 'Current'} (${detected})`;
+    }
+    const la = document.getElementById('label-a').value || 'Baseline';
+    const lb = document.getElementById('label-b').value || 'Current';
+    modeTitles.variance = modeReady.variance ? `${la} vs ${lb}` : filename;
+  }
+
+  if (mode === currentMode) {
+    dataLoaded = modeReady[currentMode];
+    document.getElementById('question-input').disabled = !dataLoaded;
+    document.getElementById('send-btn').disabled = !dataLoaded;
+    document.getElementById('main-title').textContent = modeTitles[currentMode];
+    renderTranscript(currentMode);
+  }
+}
+
+function renderProfile(p) {
+  const section = document.getElementById('profile-section');
+  const card    = document.getElementById('profile-card');
+  if (!p || !card) { if (section) section.style.display = 'none'; return; }
+  let html = `<b>${Number(p.rows).toLocaleString()}</b> rows · <b>${p.cols}</b> cols`;
+  if (p.date_range) html += `<br>${esc(p.date_range.column)}: <b>${esc(p.date_range.from)} – ${esc(p.date_range.to)}</b>`;
+  (p.null_notes || []).forEach(n => { html += `<br>${n.count.toLocaleString()} nulls in ${esc(n.column)}`; });
+  (p.top_values || []).forEach(t => { html += `<br>Top ${esc(t.column)}: <b>${esc(t.value)}</b> (${t.count.toLocaleString()})`; });
+  card.innerHTML = html;
+  section.style.display = 'block';
+}
+
+function detectDateFromFilename(fn) {
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let m = fn.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[\s_\-.]*'?(\d{4}|\d{2})\b/i);
+  if (m) {
+    const mon = MONTHS.find(x => x.toLowerCase() === m[1].toLowerCase().slice(0, 3));
+    const yr  = m[2].length === 2 ? '20' + m[2] : m[2];
+    return `${mon} ${yr}`;
+  }
+  m = fn.match(/(20\d{2})[\s_\-.]?(0[1-9]|1[0-2])\b/);
+  if (m) return `${MONTHS[parseInt(m[2], 10) - 1]} ${m[1]}`;
+  m = fn.match(/(0[1-9]|1[0-2])[\s_\-.](20\d{2})\b/);
+  if (m) return `${MONTHS[parseInt(m[1], 10) - 1]} ${m[2]}`;
+  m = fn.match(/\b(20\d{2})\b/);
+  if (m) return m[1];
+  return null;
+}
+
+// ── Sheet modal ───────────────────────────────────────────────────────────────
+function showSheetModal(sheets) {
+  const btns = document.getElementById('sheet-buttons');
+  btns.innerHTML = sheets.map(s =>
+    `<button class="sheet-btn" onclick="selectSheet('${esc(s)}')">${esc(s)}</button>`
+  ).join('');
+  document.getElementById('sheet-modal').classList.add('open');
+}
+
+async function selectSheet(sheetName) {
+  closeSheetModal();
+  if (!pendingSheet) return;
+  const { endpoint, file, statusEl, zoneId, label } = pendingSheet;
+  pendingSheet = null;
+
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('sheet_name', sheetName);
+  if (label) fd.append('label', label);
+
+  try {
+    const r = await fetch(`/upload/${endpoint}`, { method: 'POST', body: fd });
+    const d = await r.json();
+    if (d.error) { setStatus(statusEl, '✗ ' + d.error, 'err'); return; }
+    onUploadSuccess(d, endpoint, statusEl, `${file.name} [${sheetName}]`);
+  } catch(e) {
+    setStatus(statusEl, '✗ ' + e.message, 'err');
+  }
+}
+
+function closeSheetModal() {
+  document.getElementById('sheet-modal').classList.remove('open');
+}
+
+// ── Mode switching ────────────────────────────────────────────────────────────
+function switchMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+  document.querySelectorAll('.mode-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${mode}`));
+
+  const badge = document.getElementById('mode-badge');
+  badge.textContent = MODE_LABELS[mode];
+  badge.className   = `mode-badge ${mode === 'standard' ? '' : mode}`;
+
+  // v2 tab-switch fix: each tab keeps its own conversation on screen.
+  // Re-render this tab's transcript instead of wiping the display.
+  document.getElementById('main-title').textContent = modeTitles[mode];
+  dataLoaded = modeReady[mode];
+  document.getElementById('question-input').disabled = !dataLoaded;
+  document.getElementById('send-btn').disabled = !dataLoaded || isThinking;
+  showView('chat');
+  renderTranscript(mode);
+}
+
+// Rebuild the chat pane for a mode from its stored transcript:
+// anomaly nudge, suggestion chips, then every message (charts re-rendered).
+function renderTranscript(mode) {
+  const body = document.getElementById('chat-body');
+  Object.keys(chartInstances).forEach(id => { try { chartInstances[id].destroy(); } catch (e) {} });
+  chartInstances = {};
+  body.innerHTML = '';
+
+  // Anomaly nudge (dismissible, per tab)
+  if (modeAnomalies[mode].length && !nudgeDismissed[mode]) {
+    const n = document.createElement('div');
+    n.className = 'nudge';
+    n.innerHTML = `<span>👀</span><span><strong>Did you notice?</strong> ${modeAnomalies[mode].map(esc).join(' ')}</span>
+      <button class="nudge-x" title="Dismiss" onclick="dismissNudge()">✕</button>`;
+    body.appendChild(n);
+  }
+
+  // Starter question chips
+  if (modeSuggestions[mode].length && modeReady[mode]) {
+    const c = document.createElement('div');
+    c.className = 'chips-bar';
+    c.innerHTML = modeSuggestions[mode].map(s =>
+      `<button class="chip" onclick="askChip(this.textContent)">${esc(s)}</button>`).join('');
+    body.appendChild(c);
+  }
+
+  const entries = transcripts[mode];
+  if (!entries.length) {
+    const e = document.createElement('div');
+    e.className = 'empty-state';
+    e.id = 'empty-state';
+    e.innerHTML = modeReady[mode]
+      ? `<div class="empty-icon">💬</div><div class="empty-text">Ask a question about your data</div><div class="empty-sub">Try a suggestion above, or type below</div>`
+      : `<div class="empty-icon">◈</div><div class="empty-text">Upload a file to begin</div><div class="empty-sub">${mode === 'variance' ? 'Upload both datasets to start comparing' : 'Upload your data to start asking questions'}</div>`;
+    body.appendChild(e);
+    return;
+  }
+
+  const lastAssistantId = [...entries].reverse().find(x => x.role === 'assistant' && !x.error)?.id;
+  entries.forEach(en => renderEntry(en, en.id === lastAssistantId));
+  body.scrollTop = body.scrollHeight;
+}
+
+function dismissNudge() {
+  nudgeDismissed[currentMode] = true;
+  renderTranscript(currentMode);
+}
+
+function askChip(text) {
+  const input = document.getElementById('question-input');
+  input.value = text;
+  sendQuestion();
+}
+
+// ── Send question ─────────────────────────────────────────────────────────────
+async function sendQuestion() {
+  if (isThinking || !dataLoaded) return;
+  const input    = document.getElementById('question-input');
+  const question = input.value.trim();
+  if (!question) return;
+
+  input.value = '';
+  autoResize();
+  isThinking = true;
+  document.getElementById('send-btn').disabled = true;
+
+  const mode = currentMode;
+  questionHistory[mode].push(question);
+  transcripts[mode].push({ id: ++msgCounter, role: 'user', content: question });
+  renderEntry(transcripts[mode][transcripts[mode].length - 1], false);
+  const thinking = appendThinking();
+
+  try {
+    const r = await fetch('/ask', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ question, mode })
+    });
+    const d = await r.json();
+    thinking.remove();
+    transcripts[mode].push({
+      id: ++msgCounter, role: 'assistant',
+      content: d.error ? '⚠ ' + d.error : d.answer,
+      debugItems: d.debug || [], chartSpec: d.chart || null,
+      question, error: !!d.error,
+    });
+  } catch (e) {
+    thinking.remove();
+    transcripts[mode].push({ id: ++msgCounter, role: 'assistant',
+      content: '⚠ Network error: ' + e.message, debugItems: [], chartSpec: null,
+      question, error: true });
+  }
+
+  isThinking = false;
+  document.getElementById('send-btn').disabled = false;
+  if (mode === currentMode) renderTranscript(mode);
+  input.focus();
+}
+
+// ── Message rendering (from a transcript entry) ───────────────────────────────
+function renderEntry(entry, isLastAnswer) {
+  const body = document.getElementById('chat-body');
+  const emptyState = document.getElementById('empty-state');
+  if (emptyState) emptyState.remove();
+
+  const { role, content } = entry;
+  const div    = document.createElement('div');
+  div.className = `msg msg-${role}`;
+  div.dataset.entryId = entry.id;
+
+  const label  = role === 'user' ? 'You' : 'Assistant';
+  const bubble = role === 'assistant' ? renderMarkdown(content) : esc(content);
+
+  div.innerHTML = `
+    <div class="msg-label">${label}</div>
+    <div class="msg-bubble">${bubble}</div>
+  `;
+
+  // Chart — stable canvas id per entry so re-renders and export can find it
+  if (role === 'assistant' && entry.chartSpec) {
+    const chartEl    = document.createElement('div');
+    chartEl.className = 'chart-container';
+    const chartId    = `chart-m${entry.id}`;
+    const single     = (entry.chartSpec.datasets || []).length <= 1;
+    chartEl.innerHTML = `
+      <div class="chart-title">${esc(entry.chartSpec.title || '')}</div>
+      <div class="chart-canvas-wrap"><canvas id="${chartId}"></canvas></div>
+      <div class="chart-actions">
+        <span class="chart-type-btns" id="tb-${chartId}">
+          <button data-t="bar"  onclick="switchChartType('${chartId}','bar')">Bar</button>
+          <button data-t="line" onclick="switchChartType('${chartId}','line')">Line</button>
+          ${single ? `<button data-t="pie" onclick="switchChartType('${chartId}','pie')">Pie</button>` : ''}
+        </span>
+        <button class="btn-export" onclick="exportChart('${chartId}', '${esc(entry.chartSpec.title || 'chart')}')">↓ Export PNG</button>
+      </div>`;
+    div.querySelector('.msg-bubble').appendChild(chartEl);
+    chartSpecs[chartId] = Object.assign({}, entry.chartSpec);
+    setTimeout(() => { renderChart(chartId, chartSpecs[chartId]); markActiveType(chartId); }, 50);
+  }
+
+  // Actions row: copy, pin, refine (refine only on the latest answer,
+  // because the server keeps only the last computed result)
+  if (role === 'assistant' && !entry.error) {
+    const act = document.createElement('div');
+    act.className = 'msg-actions';
+    const isPinned = pinned.some(p => p.id === entry.id);
+    act.innerHTML = `
+      <button onclick="copyAnswer(${entry.id})" title="Copy answer text">⧉ Copy</button>
+      <button class="${isPinned ? 'pinned' : ''}" onclick="togglePin(${entry.id})" title="Pin to dashboard">⚲ ${isPinned ? 'Pinned' : 'Pin'}</button>
+      ${isLastAnswer ? `
+        <button onclick="refineAnswer(${entry.id}, 'brief')" title="Re-explain the same result in one sentence">– One sentence</button>
+        <button onclick="refineAnswer(${entry.id}, 'detail')" title="Re-explain the same result in more detail">+ More detail</button>` : ''}
+    `;
+    div.querySelector('.msg-bubble').appendChild(act);
+
+    const exportBtn = document.createElement('div');
+    exportBtn.className = 'export-actions';
+    exportBtn.innerHTML = `<button class="btn-export-excel" onclick="exportToExcel()">↓ Export to Excel</button>`;
+    div.querySelector('.msg-bubble').appendChild(exportBtn);
+  }
+
+  // Debug
+  if (role === 'assistant' && debugEnabled && (entry.debugItems || []).length) {
+    const dbg = document.createElement('details');
+    dbg.className = 'debug-block';
+    dbg.innerHTML = `
+      <summary class="debug-summary">▸ Query and Calculations Panel (${entry.debugItems.length} steps)</summary>
+      <div class="debug-content">
+        ${entry.debugItems.map(i => `
+          <div>
+            <div class="debug-item-label">${esc(i.label)}</div>
+            <div class="debug-code">${esc(i.content)}</div>
+          </div>`).join('')}
+        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #E0E4EA;">
+          <button class="btn-export-debug" onclick="exportDebugResult()" title="Export raw query result data (supports multi-sheet for dict results)">
+            ↓ Export Raw Data
+          </button>
+        </div>
+      </div>`;
+    div.appendChild(dbg);
+  }
+
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+  return div;
+}
+
+function findEntry(id) {
+  for (const m of ['standard', 'variance']) {
+    const e = transcripts[m].find(x => x.id === id);
+    if (e) return e;
+  }
+  return null;
+}
+
+function copyAnswer(id) {
+  const e = findEntry(id);
+  if (!e) return;
+  navigator.clipboard.writeText(e.content).then(() => {
+    const btn = document.querySelector(`[data-entry-id="${id}"] .msg-actions button`);
+    if (btn) { const t = btn.textContent; btn.textContent = '✓ Copied'; setTimeout(() => btn.textContent = t, 1200); }
+  });
+}
+
+// Re-run ONLY Call 2 on the same computed result — numbers cannot change.
+async function refineAnswer(id, style) {
+  const e = findEntry(id);
+  if (!e || isThinking) return;
+  isThinking = true;
+  const bubbleEl = document.querySelector(`[data-entry-id="${id}"] .msg-bubble`);
+  if (bubbleEl) bubbleEl.style.opacity = '0.5';
+  try {
+    const r = await fetch('/ask/refine', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ style, mode: currentMode })
+    });
+    const d = await r.json();
+    if (d.answer) { e.content = d.answer; }
+    else if (d.error) { alert(d.error); }
+  } catch (err) { alert('Refine failed: ' + err.message); }
+  isThinking = false;
+  renderTranscript(currentMode);
+}
+
+function appendThinking() {
+  const body = document.getElementById('chat-body');
+  const div  = document.createElement('div');
+  div.className = 'thinking';
+  div.innerHTML  = '<div class="dot"></div><div class="dot"></div><div class="dot"></div> Analyzing data...';
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+  return div;
+}
+
+// ── Chart rendering ───────────────────────────────────────────────────────────
+// Switch a rendered chart to another type — pure client-side re-render of the
+// spec we already have. No LLM call, numbers unchanged.
+function switchChartType(canvasId, newType) {
+  const spec = chartSpecs[canvasId];
+  if (!spec) return;
+  spec.type = newType;
+  renderChart(canvasId, spec);
+  markActiveType(canvasId);
+}
+
+function markActiveType(canvasId) {
+  const spec = chartSpecs[canvasId];
+  const bar  = document.getElementById(`tb-${canvasId}`);
+  if (!spec || !bar) return;
+  const t = spec.type === 'doughnut' || spec.type === 'donut' ? 'pie'
+          : (spec.type === 'multiline' || spec.type === 'line') ? 'line'
+          : spec.type === 'pie' ? 'pie' : 'bar';
+  bar.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.t === t));
+}
+
+function renderChart(canvasId, spec) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  // Destroy previous instance if re-rendering
+  if (chartInstances[canvasId]) { chartInstances[canvasId].destroy(); }
+
+  const type    = spec.type === 'donut' ? 'doughnut' :
+                  spec.type === 'multiline' ? 'line' :
+                  spec.type === 'stacked_bar' ? 'bar' :
+                  spec.type;
+  const isPolar = ['pie', 'doughnut'].includes(type);
+  const isStacked = spec.type === 'stacked_bar';
+
+  // Dark mode: swap the near-black leading colors for lighter blues
+  const dark = document.documentElement.dataset.theme === 'dark';
+  const PALETTE = dark
+    ? ['#7FA3D8', '#5D82BC', '#8A9BB0', '#C8CED8', '#3DD68C', '#E8A54B', '#6EA8FE', '#B39DDB']
+    : CHART_COLORS;
+
+  const datasets = (spec.datasets || []).map((ds, i) => ({
+    label:           ds.label || '',
+    data:            ds.data  || [],
+    backgroundColor: isPolar
+      ? PALETTE.map(c => c + 'cc')
+      : (PALETTE[i % PALETTE.length] + (type === 'line' ? '20' : 'cc')),
+    borderColor:     PALETTE[i % PALETTE.length],
+    borderWidth:     type === 'line' ? 2 : 1,
+    borderRadius:    type === 'bar' ? 3 : 0,
+    fill:            type === 'line' ? true : false,
+    tension:         0.3,
+    pointRadius:     type === 'line' ? 3 : 0,
+    pointBackgroundColor: PALETTE[i % PALETTE.length],
+  }));
+
+  const config = {
+    type: type,
+    data: { labels: spec.labels || [], datasets },
+    options: {
+      indexAxis: spec.indexAxis || 'x',  // Support horizontal bars
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 600, easing: 'easeOutQuart' },
+      plugins: {
+        legend: {
+          display: datasets.length > 1 || isPolar,
+          labels: { font: { family: 'Inter', size: 11 }, color: '#4A5568', boxWidth: 10, padding: 12 }
+        },
+        tooltip: {
+          backgroundColor: '#0A1628',
+          titleFont: { family: 'IBM Plex Mono', size: 11 },
+          bodyFont:  { family: 'IBM Plex Mono', size: 11 },
+          padding: 10, cornerRadius: 4,
+        }
+      },
+      scales: isPolar ? {} : {
+        x: {
+          stacked: isStacked,
+          title: { display: !!spec.x_label, text: spec.x_label, color: '#8A9BB0', font: { family: 'Inter', size: 11 } },
+          ticks: { color: '#8A9BB0', font: { family: 'IBM Plex Mono', size: 10 } },
+          grid:  { color: dark ? '#26334A' : '#ECEEF2' },
+          beginAtZero: true,
+        },
+        y: {
+          stacked: isStacked,
+          title: { display: !!spec.y_label, text: spec.y_label, color: '#8A9BB0', font: { family: 'Inter', size: 11 } },
+          ticks: { color: '#8A9BB0', font: { family: 'IBM Plex Mono', size: 10 } },
+          grid:  { color: dark ? '#26334A' : '#ECEEF2' },
+          beginAtZero: true,
+        }
+      }
+    }
+  };
+
+  chartInstances[canvasId] = new Chart(canvas, config);
+}
+
+function exportChart(canvasId, title) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const a    = document.createElement('a');
+  a.href     = canvas.toDataURL('image/png');
+  a.download = `${title.replace(/\s+/g, '_')}.png`;
+  a.click();
+}
+
+async function exportToExcel() {
+  try {
+    const r = await fetch('/export/last_result');
+    if (!r.ok) {
+      const err = await r.json();
+      alert(err.error || 'Export failed');
+      return;
+    }
+    const blob = await r.blob();
+    const url  = window.URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `query_result_${Date.now()}.xlsx`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  } catch (e) {
+    alert('Export failed: ' + e.message);
+  }
+}
+
+async function exportDebugResult() {
+  try {
+    const r = await fetch('/export/debug_result');
+    if (!r.ok) {
+      const err = await r.json();
+      alert(err.error || 'Export failed');
+      return;
+    }
+    const blob = await r.blob();
+    const url  = window.URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `debug_result_${Date.now()}.xlsx`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  } catch (e) {
+    alert('Export failed: ' + e.message);
+  }
+}
+
+// ── Pin dashboard (session-scoped snapshots) ─────────────────────────────────
+function togglePin(id) {
+  const e = findEntry(id);
+  if (!e) return;
+  const idx = pinned.findIndex(p => p.id === id);
+  if (idx >= 0) pinned.splice(idx, 1);
+  else pinned.push({ id, question: e.question || 'Answer', answer: e.content,
+                     chartSpec: e.chartSpec ? Object.assign({}, e.chartSpec) : null,
+                     file: modeTitles[currentMode], ts: new Date().toLocaleDateString() });
+  updateDashTab();
+  renderTranscript(currentMode);
+}
+
+function updateDashTab() {
+  document.getElementById('view-tab-dash').textContent =
+    pinned.length ? `Dashboard · ${pinned.length}` : 'Dashboard';
+}
+
+function showView(view) {
+  currentView = view;
+  document.getElementById('view-tab-chat').classList.toggle('active', view === 'chat');
+  document.getElementById('view-tab-dash').classList.toggle('active', view === 'dashboard');
+  document.getElementById('chat-body').style.display = view === 'chat' ? '' : 'none';
+  document.getElementById('input-area').style.display = view === 'chat' ? '' : 'none';
+  document.getElementById('dash-body').style.display = view === 'dashboard' ? 'block' : 'none';
+  if (view === 'dashboard') renderDashboard();
+}
+
+function renderDashboard() {
+  const grid  = document.getElementById('dash-grid');
+  const empty = document.getElementById('dash-empty');
+  dashCharts.forEach(c => { try { c.destroy(); } catch (e) {} });
+  dashCharts = [];
+  grid.innerHTML = '';
+  empty.style.display = pinned.length ? 'none' : 'block';
+
+  pinned.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'dash-card';
+    card.innerHTML = `
+      <div class="dash-q"><span>${esc(p.question)}</span>
+        <button class="unpin" title="Unpin" onclick="unpinFromDash(${p.id})">⚲✕</button></div>
+      ${p.chartSpec ? `<div class="dash-chart"><canvas id="dash-c-${p.id}"></canvas></div>`
+                    : `<div class="dash-a">${esc(p.answer)}</div>`}
+      <div class="dash-foot">${esc(p.file)} · pinned ${esc(p.ts)}</div>`;
+    grid.appendChild(card);
+  });
+
+  // Render chart snapshots after the DOM settles
+  setTimeout(() => {
+    pinned.forEach(p => {
+      if (!p.chartSpec) return;
+      const cv = document.getElementById(`dash-c-${p.id}`);
+      if (!cv) return;
+      const specCopy = Object.assign({}, p.chartSpec);
+      const saveId = `dash-c-${p.id}`;
+      chartSpecs[saveId] = specCopy;
+      renderChart(saveId, specCopy);
+      if (chartInstances[saveId]) dashCharts.push(chartInstances[saveId]);
+    });
+  }, 30);
+}
+
+function unpinFromDash(id) {
+  const idx = pinned.findIndex(p => p.id === id);
+  if (idx >= 0) pinned.splice(idx, 1);
+  updateDashTab();
+  renderDashboard();
+}
+
+// ── Conversation -> Word export ───────────────────────────────────────────────
+async function exportConversation() {
+  const mode = currentMode;
+  const entries = transcripts[mode].filter(e => e.role === 'assistant' && !e.error);
+  if (!entries.length) { alert('Nothing to export yet — ask a question first.'); return; }
+
+  if (currentView !== 'chat') showView('chat');   // charts must be in the DOM to capture
+
+  const includeDebug = confirm('Include the Query & Calculations appendix in the report?');
+
+  const messages = entries.map(e => {
+    let png = null;
+    if (e.chartSpec) {
+      const cv = document.getElementById(`chart-m${e.id}`);
+      if (cv) { try { png = cv.toDataURL('image/png'); } catch (err) {} }
+    }
+    return {
+      question: e.question || '',
+      answer: e.content,
+      chart_png: png,
+      chart_title: e.chartSpec ? (e.chartSpec.title || '') : null,
+      debug: includeDebug ? (e.debugItems || []) : [],
+    };
+  });
+
+  try {
+    const r = await fetch('/export/conversation', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode, filename: modeTitles[mode], meta: modeMeta[mode],
+                             user: null, include_debug: includeDebug, messages })
+    });
+    if (!r.ok) { const err = await r.json(); alert(err.error || 'Export failed'); return; }
+    const blob = await r.blob();
+    const url  = window.URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `ChatWithData_report_${Date.now()}.docx`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  } catch (e) { alert('Export failed: ' + e.message); }
+}
+
+// ── Dark mode ─────────────────────────────────────────────────────────────────
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t;
+  localStorage.setItem('cwd_theme', t);
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = t === 'dark' ? '☀' : '◐';
+}
+
+function toggleTheme() {
+  const next = (document.documentElement.dataset.theme === 'dark') ? 'light' : 'dark';
+  applyTheme(next);
+  renderTranscript(currentMode);           // re-render charts with the right palette
+  if (currentView === 'dashboard') renderDashboard();
+}
+
+// ── Question history dropdown ─────────────────────────────────────────────────
+function toggleHistory() {
+  const pop = document.getElementById('hist-pop');
+  if (pop.classList.contains('open')) { pop.classList.remove('open'); return; }
+  const items = questionHistory[currentMode].slice(-10).reverse();
+  pop.innerHTML = items.length
+    ? items.map(q => `<div class="hist-item" onclick="useHistory(this.textContent)">${esc(q)}</div>`).join('')
+    : '<div class="hist-none">No questions asked in this tab yet.</div>';
+  pop.classList.add('open');
+}
+
+function useHistory(q) {
+  document.getElementById('hist-pop').classList.remove('open');
+  const input = document.getElementById('question-input');
+  input.value = q;
+  autoResize();
+  input.focus();
+}
+
+// ── Schema + preview ──────────────────────────────────────────────────────────
+function renderSchema(columns) {
+  document.getElementById('schema-list').innerHTML =
+    columns.map(c => `<span class="pill">${c.name} <em>${c.type}</em></span>`).join('');
+  document.getElementById('schema-section').style.display = 'block';
+}
+
+function renderPreview(columns, rows) {
+  const thead = `<thead><tr>${columns.map(c => `<th>${c.name}</th>`).join('')}</tr></thead>`;
+  const tbody = `<tbody>${rows.map(row =>
+    `<tr>${columns.map(c => `<td>${row[c.name] ?? ''}</td>`).join('')}</tr>`
+  ).join('')}</tbody>`;
+  document.getElementById('preview-table').innerHTML = thead + tbody;
+  document.getElementById('preview-section').style.display = 'block';
+}
+
+// ── Markdown renderer ─────────────────────────────────────────────────────────
+function renderMarkdown(text) {
+  // Tables
+  text = text.replace(/(\|.+\|\n?)+/g, match => {
+    const rows = match.trim().split('\n').filter(r => r.includes('|'));
+    if (rows.length < 2) return match;
+    const headers = rows[0].split('|').filter(c => c.trim());
+    const body    = rows.slice(2).map(r => r.split('|').filter(c => c.trim()));
+    return `<div class="table-wrapper"><table><thead><tr>${headers.map(h => `<th>${h.trim()}</th>`).join('')}</tr></thead>`
+         + `<tbody>${body.map(r => `<tr>${r.map(c => `<td>${c.trim()}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  });
+  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/\n/g, '<br>');
+  return text;
+}
+
+// ── Misc helpers ──────────────────────────────────────────────────────────────
+function setStatus(el, msg, cls) {
+  el.textContent = msg;
+  el.className   = `upload-status${cls ? ' ' + cls : ''}`;
+  if (cls) el.style.display = 'block';
+}
+
+function updateEmptyState() {
+  const el = document.getElementById('empty-state');
+  if (el) el.style.display = 'none';
+}
+
+async function clearChat() {
+  // Nothing persists in this edition — offer the Word export before wiping.
+  const hasAnswers = transcripts[currentMode].some(e => e.role === 'assistant' && !e.error);
+  if (hasAnswers && confirm('Export this conversation to Word before clearing?')) {
+    await exportConversation();
+  }
+  await fetch('/clear', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode: currentMode })          // clears THIS tab only
+  });
+  transcripts[currentMode] = [];
+  renderTranscript(currentMode);
+}
+
+function setupDragDrop(zoneId, inputId) {
+  const zone = document.getElementById(zoneId);
+  if (!zone) return;
+  zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    const input = document.getElementById(inputId);
+    const dt    = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change'));
+  });
+}
+
+
+function setupLogoUpload() {
+  // Logo is now permanent - no upload needed
+}
+
+function setupTextarea() {
+  const ta = document.getElementById('question-input');
+  ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendQuestion(); } });
+  ta.addEventListener('input', autoResize);
+}
+
+// ── Monte Carlo ───────────────────────────────────────────────────────────────
+function updateMcLabels() {} // kept for compatibility, no longer used
+
+let mcProgressInterval = null;
+let mcStartTime = null;
+let mcIterations = 0;
+
+async function pollMcProgress() {
+  const progressContainer = document.getElementById('mc-progress-container');
+  const progressBar = document.getElementById('mc-progress-bar');
+  const progressText = document.getElementById('mc-progress-text');
+  const progressDetails = document.getElementById('mc-progress-details');
+
+  try {
+    const r = await fetch('/montecarlo/progress');
+    const d = await r.json();
+
+    console.log('[MC Debug] Progress poll response:', d);
+
+    if (!d.ok) {
+      console.log('[MC Debug] Progress poll returned not ok');
+      clearInterval(mcProgressInterval);
+      progressContainer.style.display = 'none';
+      return;
+    }
+
+    if (d.status === 'running' && d.progress) {
+      const p = d.progress;
+      progressBar.style.width = p.percent + '%';
+      progressText.textContent = `Progress: ${p.current.toLocaleString()} / ${p.total.toLocaleString()} (${p.percent}%)`;
+      progressDetails.textContent = p.remaining_min > 0
+        ? `Estimated time remaining: ${p.remaining_min} minutes`
+        : 'Calculating...';
+    } else if (d.status === 'complete') {
+      console.log('[MC Debug] Simulation complete! Result:', d.result);
+      clearInterval(mcProgressInterval);
+      progressBar.style.width = '100%';
+
+      // Re-enable button immediately
+      const btn = document.getElementById('mc-run-btn');
+      btn.disabled = false;
+      btn.textContent = '▶ Run Monte Carlo';
+
+      // Calculate actual duration
+      const duration = mcStartTime ? ((Date.now() - mcStartTime) / 1000).toFixed(1) : '?';
+      progressText.textContent = `✓ Complete! (${duration}s)`;
+      progressDetails.textContent = `Processed ${mcIterations.toLocaleString()} iterations`;
+
+      // Keep progress bar visible for 4 seconds so users can see it
+      setTimeout(() => { progressContainer.style.display = 'none'; }, 4000);
+
+      // Show results
+      console.log('[MC Debug] Calling showMcResults...');
+      showMcResults(d.result);
+    } else if (d.status === 'error') {
+      console.error('[MC Debug] Simulation error:', d.error);
+      clearInterval(mcProgressInterval);
+      progressContainer.style.display = 'none';
+      const statusEl = document.getElementById('status-mc');
+      setStatus(statusEl, '✗ ' + d.error, 'err');
+      const btn = document.getElementById('mc-run-btn');
+      btn.disabled = false;
+      btn.textContent = '▶ Run Monte Carlo';
+    }
+  } catch (err) {
+    console.error('[MC Debug] Progress poll error:', err);
+    // If polling fails, re-enable button after 5 seconds as safety measure
+    setTimeout(() => {
+      const btn = document.getElementById('mc-run-btn');
+      if (btn && btn.disabled) {
+        btn.disabled = false;
+        btn.textContent = '▶ Run Monte Carlo';
+        console.log('[MC Debug] Button re-enabled after polling error');
+      }
+    }, 5000);
+  }
+}
+
+function showMcResults(res) {
+  console.log('[MC Debug] showMcResults called with:', res);
+  console.log('[MC Debug] Result keys:', Object.keys(res));
+  console.log('[MC Debug] Has histogram_labels?', 'histogram_labels' in res, res.histogram_labels);
+  console.log('[MC Debug] Has histogram_data?', 'histogram_data' in res, res.histogram_data);
+  console.log('[MC Debug] Has tornado?', 'tornado' in res, res.tornado);
+  console.log('[MC Debug] Tornado length:', res.tornado ? res.tornado.length : 0);
+
+  const btn = document.getElementById('mc-run-btn');
+  const statusEl = document.getElementById('status-mc');
+
+  btn.disabled = false;
+  btn.textContent = '▶ Run Monte Carlo';
+
+  // Calculate and display last run info
+  if (mcStartTime) {
+    const duration = ((Date.now() - mcStartTime) / 1000).toFixed(1);
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    document.getElementById('mc-last-run').style.display = 'block';
+    document.getElementById('mc-last-duration').textContent = `${duration}s`;
+    document.getElementById('mc-last-iterations').textContent = mcIterations.toLocaleString();
+    document.getElementById('mc-last-time').textContent = timeStr;
+  }
+
+  if (!res) {
+    console.error('[MC Debug] No result provided to showMcResults');
+    setStatus(statusEl, '✗ No results returned', 'err');
+    return;
+  }
+
+  const calNote = res.calendar_aware
+    ? '✓ GA-ASI 9-80 calendar applied'
+    : '⚠ Calendar file not found — using calendar days';
+  setStatus(statusEl,
+    `✓ P80: ${res.p_dates.p80} · ${res.probability_on_time}% on time · ${calNote}`, 'ok');
+
+  // Build summary message with P-dates
+  const pdatesText =
+    `**Probability of Completion:**\n` +
+    `- P60 (60% confidence): ${res.p_dates.p60}\n` +
+    `- P70 (70% confidence): ${res.p_dates.p70}\n` +
+    `- P80 (80% confidence): ${res.p_dates.p80}\n` +
+    `- P90 (90% confidence): ${res.p_dates.p90}\n` +
+    `- P100 (100% confidence): ${res.p_dates.p100}`;
+
+  const summary = `📊 **Monte Carlo Simulation Complete**\n\n${res.summary_text}\n\n${pdatesText}`;
+  console.log('[MC Debug] Adding summary message:', summary);
+  appendMessage('assistant', summary, [], null);
+
+  // Create HISTOGRAM CHART
+  console.log('[MC Debug] Checking for histogram data...');
+  console.log('[MC Debug] Histogram object:', res.histogram);
+
+  // Check if histogram exists and has data
+  const histogram = res.histogram || {};
+  if (histogram.labels && histogram.data) {
+    console.log('[MC Debug] Creating histogram chart with', histogram.labels.length, 'bins');
+    const histogramSpec = {
+      type: 'bar',
+      title: 'Completion Date Probability Distribution',
+      labels: histogram.labels,
+      datasets: [{
+        label: 'Number of Simulations',
+        data: histogram.data
+      }],
+      x_label: 'Completion Date',
+      y_label: 'Frequency'
+    };
+    appendMessage('assistant', '**Histogram:** Probability distribution showing likelihood of completing by various dates', [], histogramSpec);
+  } else {
+    console.log('[MC Debug] No histogram data found. histogram.labels:', histogram.labels, 'histogram.data:', histogram.data);
+  }
+
+  // Create TORNADO CHART (horizontal bars, sorted by impact)
+  console.log('[MC Debug] Checking for tornado data...');
+  const tornado = res.tornado || [];
+  if (tornado.length > 0) {
+    console.log('[MC Debug] Creating tornado chart with', tornado.length, 'items');
+
+    // Take top 10, already sorted by impact from backend
+    const top10 = tornado.slice(0, 10);
+
+    // Reverse order so largest is at top (Chart.js renders bottom to top)
+    const reversed = [...top10].reverse();
+
+    const tornadoSpec = {
+      type: 'bar',
+      title: 'Tornado Chart - Top 10 Risk Drivers',
+      labels: reversed.map(t => t.task_name.substring(0, 40) + (t.task_name.length > 40 ? '...' : '')),
+      datasets: [{
+        label: 'Schedule Impact (days)',
+        data: reversed.map(t => t.swing_days),
+        backgroundColor: reversed.map(t =>
+          t.risk_level === 'H' ? '#dc3545cc' :
+          t.risk_level === 'M' ? '#ffc107cc' : '#28a745cc'
+        ),
+        borderColor: reversed.map(t =>
+          t.risk_level === 'H' ? '#dc3545' :
+          t.risk_level === 'M' ? '#ffc107' : '#28a745'
+        )
+      }],
+      x_label: 'Schedule Impact (days)',
+      y_label: 'Task',
+      indexAxis: 'y'  // This makes it horizontal!
+    };
+
+    const tornadoText = `**Top 10 Risk Drivers (Tornado Chart):**\n\n` +
+      top10.map((t, i) =>
+        `${i+1}. **${t.task_name}** (${t.risk_level} risk)\n` +
+        `   - Impact: ${t.swing_days} days (${t.contribution_pct}% of total variance)`
+      ).join('\n\n');
+
+    appendMessage('assistant', tornadoText, [], tornadoSpec);
+  }
+}
+
+async function runMonteCarlo() {
+  const btn      = document.getElementById('mc-run-btn');
+  const statusEl = document.getElementById('status-mc');
+  const iterationsSelect = document.getElementById('mc-iterations');
+  const iterations = parseInt(iterationsSelect.value);
+  const progressContainer = document.getElementById('mc-progress-container');
+  const progressBar = document.getElementById('mc-progress-bar');
+  const progressText = document.getElementById('mc-progress-text');
+
+  btn.disabled    = true;
+  btn.textContent = '⏳ Running...';
+  statusEl.style.display = 'none';
+
+  // Capture start time and iterations for last run tracking
+  mcStartTime = Date.now();
+  mcIterations = iterations;
+
+  // Show progress bar
+  progressContainer.style.display = 'block';
+  progressBar.style.width = '0%';
+  progressText.textContent = 'Starting simulation...';
+
+  try {
+    const r = await fetch('/montecarlo/run', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ iterations: iterations })
+    });
+    const d = await r.json();
+
+    if (d.error) {
+      progressContainer.style.display = 'none';
+      setStatus(statusEl, '✗ ' + d.error, 'err');
+      statusEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = '▶ Run Monte Carlo';
+    } else {
+      // Start polling for progress
+      mcProgressInterval = setInterval(pollMcProgress, 500); // Poll every 500ms
+    }
+  } catch (err) {
+    progressContainer.style.display = 'none';
+    setStatus(statusEl, '✗ Network error: ' + err.message, 'err');
+    statusEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = '▶ Run Monte Carlo';
+  }
+}
+// ── Narrative document upload ─────────────────────────────────────────────────
+function initNarrativeUpload() {
+  const input = document.getElementById('file-narrative');
+  if (!input) return;
+  setupDragDrop('zone-narrative', 'file-narrative');
+  input.addEventListener('change', async e => {
+    if (!e.target.files[0]) return;
+    const statusEl = document.getElementById('status-narrative');
+    setStatus(statusEl, 'Reading document...', '');
+    statusEl.style.display = 'block';
+    const fd = new FormData();
+    fd.append('file', e.target.files[0]);
+    try {
+      const r = await fetch('/upload/narrative', { method: 'POST', body: fd });
+      const d = await r.json();
+      if (d.error) {
+        setStatus(statusEl, '✗ ' + d.error, 'err');
+      } else {
+        setStatus(statusEl, `✓ ${d.filename} · ${d.word_count.toLocaleString()} words`, 'ok');
+      }
+    } catch (err) {
+      setStatus(statusEl, '✗ ' + err.message, 'err');
+    }
+  });
+}
+
+function autoResize() {
+  const ta    = document.getElementById('question-input');
+  ta.style.height = 'auto';
+  ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── IMS Health Check ──────────────────────────────────────────────────────────
+function initImsUpload() {
+  const input = document.getElementById('file-ims');
+  if (!input) return;
+  setupDragDrop('zone-ims', 'file-ims');
+  input.addEventListener('change', async e => {
+    if (!e.target.files[0]) return;
+    const file     = e.target.files[0];
+    const statusEl = document.getElementById('status-ims');
+    setStatus(statusEl, 'Loading...', '');
+
+    const fd = new FormData();
+    fd.append('file', file);
+
+    try {
+      const r = await fetch('/upload/ims', { method: 'POST', body: fd });
+      const d = await r.json();
+
+      if (d.needs_sheet_selection) {
+        pendingSheet = { endpoint: 'ims', file, statusEl, zoneId: 'zone-ims', label: null };
+        showSheetModal(d.sheets);
+        return;
+      }
+      if (d.error) { setStatus(statusEl, '✗ ' + d.error, 'err'); return; }
+
+      setStatus(statusEl, `✓ ${d.rows} rows · ${d.cols} cols`, 'ok');
+      document.getElementById('ims-file-info').textContent =
+        `${d.filename} — ${d.rows.toLocaleString()} tasks, ${d.cols} fields`;
+      document.getElementById('ims-run-section').style.display = 'block';
+      document.getElementById('main-title').textContent = d.filename;
+
+    } catch (err) {
+      setStatus(statusEl, '✗ ' + err.message, 'err');
+    }
+  });
+}
+
+async function runHealthCheck() {
+  const btn      = document.getElementById('ims-run-btn');
+  const statusEl = document.getElementById('status-ims-run');
+  btn.disabled    = true;
+  btn.textContent = '⏳ Running 33 checks...';
+  setStatus(statusEl, 'Analyzing schedule...', '');
+  statusEl.style.display = 'block';
+
+  // Clear previous results
+  const chatBody = document.getElementById('chat-body');
+  const emptyEl  = document.getElementById('empty-state');
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  try {
+    const r = await fetch('/healthcheck/run', { method: 'POST' });
+    const d = await r.json();
+
+    if (d.error) { setStatus(statusEl, '✗ ' + d.error, 'err'); btn.disabled = false; btn.textContent = '▶ Run Health Check'; return; }
+
+    setStatus(statusEl,
+      `✓ Complete — Score: ${d.summary.health_score}% · ${d.summary.fail} FAIL · ${d.summary.warn} WARN`, 'ok');
+
+    renderImsResults(d.summary, d.results);
+    document.getElementById('ims-export-section').style.display = 'block';
+    dataLoaded = true;
+
+  } catch (err) {
+    setStatus(statusEl, '✗ ' + err.message, 'err');
+  }
+
+  btn.disabled    = false;
+  btn.textContent = '▶ Run Health Check';
+}
+
+function renderImsResults(summary, results) {
+  const chatBody = document.getElementById('chat-body');
+
+  // Summary cards
+  const scoreColor = summary.health_score >= 80 ? 'var(--success)' : summary.health_score >= 60 ? 'var(--warn)' : 'var(--error)';
+  const summaryHtml = `
+    <div class="ims-summary-row">
+      <div class="ims-summary-card">
+        <div class="val" style="color:${scoreColor}">${summary.health_score}%</div>
+        <div class="lbl">Health Score</div>
+      </div>
+      <div class="ims-summary-card pass"><div class="val">${summary.pass}</div><div class="lbl">Pass</div></div>
+      <div class="ims-summary-card fail"><div class="val">${summary.fail}</div><div class="lbl">Fail</div></div>
+      <div class="ims-summary-card warn"><div class="val">${summary.warn}</div><div class="lbl">Warn</div></div>
+      <div class="ims-summary-card"><div class="val">${summary.manual}</div><div class="lbl">Manual</div></div>
+    </div>`;
+
+  // Results table
+  const statusOrder = {FAIL:0, WARN:1, PASS:2, NA:3, MANUAL:4, FUTURE:5};
+  const sorted = [...results].sort((a,b) => (statusOrder[a.status]||9) - (statusOrder[b.status]||9));
+
+  const rows = sorted.map(r => {
+    const affected = r.affected_count > 0 ? `<span style="color:var(--error);font-weight:600">${r.affected_count}</span>` : '—';
+    const summary_text = esc(r.summary || '').substring(0, 120) + (r.summary && r.summary.length > 120 ? '...' : '');
+    return `<tr>
+      <td style="font-family:var(--mono);font-weight:600">${esc(r.uid)}</td>
+      <td>${esc(r.category)}</td>
+      <td><span style="color:${r.severity==='Critical'?'var(--error)':r.severity==='Major'?'var(--warn)':'var(--silver)'};font-weight:600">${esc(r.severity)}</span></td>
+      <td>${esc(r.title)}</td>
+      <td><span class="ims-status-badge ims-status-${r.status}">${r.status}</span></td>
+      <td style="text-align:center">${affected}</td>
+      <td style="font-size:0.68rem;color:var(--text2)">${summary_text}</td>
+    </tr>`;
+  }).join('');
+
+  const tableHtml = `
+    <div class="ims-results-wrap">
+      <table class="ims-results-table">
+        <thead><tr>
+          <th>UID</th><th>Category</th><th>Severity</th><th>Check</th>
+          <th>Status</th><th>Count</th><th>Summary</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+
+  const div = document.createElement('div');
+  div.className = 'msg msg-assistant';
+  div.style.maxWidth = '100%';
+  div.innerHTML = `
+    <div class="msg-label">IMS Health Check Results — ${results.length} checks</div>
+    <div class="msg-bubble" style="max-width:100%">
+      ${summaryHtml}
+      ${tableHtml}
+    </div>`;
+  chatBody.appendChild(div);
+  chatBody.scrollTop = chatBody.scrollHeight;
+}
+
+function exportImsReport() {
+  window.location.href = '/healthcheck/export';
+}
+</script>
+</body>
+</html>
