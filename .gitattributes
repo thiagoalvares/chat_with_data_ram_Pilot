@@ -9,3 +9,5 @@
 *.ico  binary
 *.xlsx binary
 *.xls  binary
+*.woff2 binary
+*.js -text
