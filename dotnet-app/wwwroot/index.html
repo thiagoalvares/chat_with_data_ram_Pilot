@@ -302,6 +302,20 @@
     .steps-box ol { margin: 0.4rem 0 0 1.1rem; line-height: 1.9; color: var(--text2); }
     .steps-box a { color: var(--navy-mid); font-weight: 600; }
     .key-input { width: 100%; padding: 0.6rem 0.8rem; border: 1.5px solid var(--border2); border-radius: 6px; font-family: var(--mono); font-size: 0.78rem; background: var(--bg); color: var(--text); }
+    /* Onboarding wizard (Apple-style walkthrough) */
+    .onboard { width: min(560px, 86vw); text-align: center; }
+    .onboard-dots { display: flex; justify-content: center; gap: 0.45rem; margin-bottom: 1.1rem; }
+    .onboard-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border2); transition: background 0.2s, transform 0.2s; }
+    .onboard-dot.active { background: var(--navy-mid); transform: scale(1.25); }
+    .onboard-dot.done { background: var(--navy-light); }
+    .onboard-title { font-size: 1.35rem; font-weight: 700; color: var(--navy); letter-spacing: -0.01em; margin-bottom: 0.6rem; }
+    html[data-theme="dark"] .onboard-title { color: var(--text); }
+    .onboard-text { font-size: 0.86rem; line-height: 1.65; color: var(--text2); max-width: 44ch; margin: 0 auto 1.1rem; }
+    .onboard-img { max-width: 100%; border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-md); margin-bottom: 1.1rem; }
+    .onboard-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 0.4rem; }
+    .onboard-skip { font-size: 0.72rem; color: var(--silver); text-decoration: none; display: inline-block; margin-top: 0.9rem; cursor: pointer; }
+    .onboard-skip:hover { color: var(--navy-mid); text-decoration: underline; }
+    .onboard-portal-btn { display: inline-block; text-decoration: none; margin-bottom: 1.1rem; }
     .key-input:focus { outline: none; border-color: var(--navy); }
     .key-error { color: var(--error); font-size: 0.72rem; margin-top: 0.5rem; display: none; }
     .btn-primary-sm { font-family: var(--inter); font-size: 0.74rem; font-weight: 600; color: #fff; background: var(--navy); border: none; border-radius: 6px; padding: 0.55rem 1.2rem; cursor: pointer; }
@@ -1850,28 +1864,94 @@ async function checkUserApiKey() {
   } catch (e) { console.error('check_key failed:', e); }
 }
 
-function showOnboardingModal() {
+// Step-by-step walkthrough (screenshots from the ITS instructions doc, vendored
+// in /images/onboarding/ with names/identifiers blurred). Shown automatically
+// while the user has no saved key; replayable from Settings (replay adds a ✕).
+const PORTAL_URL = 'https://funcapp-genie-prod.azurewebsites.us/api/aigateway-request';
+const ONBOARD_STEPS = [
+  { title: 'Welcome to Chat with Data! 👋',
+    text: `We're excited to have you. Before your first question, you'll need a personal API key —
+           it takes about two minutes, and we'll walk you through it click by click.`,
+    cta: "Let's get started", skip: true },
+  { title: 'Open the API key portal',
+    text: `Click the button below — the portal opens in a new browser tab, so keep this window
+           open and follow along. In the portal, fill in your GA email and select your department.`,
+    portal: true },
+  { title: 'Click “Request API Key”',
+    text: 'At the bottom of the portal form, click the big blue button.',
+    img: '/images/onboarding/step_request.png' },
+  { title: 'Now check your email 📬',
+    text: `In a few moments you'll receive an email that your key is ready.
+           Open it and click “View Secret in Azure Portal”.`,
+    img: '/images/onboarding/step_email.png' },
+  { title: 'Open the current version',
+    text: `The link takes you to Azure Key Vault. Click the value listed under
+           “CURRENT VERSION” (highlighted below).`,
+    img: '/images/onboarding/step_vault.png' },
+  { title: 'Reveal and copy your key',
+    text: `Click “Show Secret Value”, then use the copy icon next to the secret value.
+           That's your key — it starts with “sk-”.`,
+    img: '/images/onboarding/step_secret.png' },
+  { title: 'Paste your key below 🎉',
+    text: `Last step! Paste the key you just copied and you're ready to start asking
+           questions about your data. Your key is stored encrypted, and usage is
+           tracked to your own account.`,
+    paste: true },
+];
+
+let _onboardStep = 0;
+let _onboardReplay = false;
+
+function showOnboardingModal(replay = false) {
   if (document.getElementById('onboarding-overlay')) return;
-  makeOverlay('onboarding-overlay', `
-    <div class="modal-title">Welcome to Chat with Data</div>
-    <div class="modal-sub">To use the app, add your personal LiteLLM API key. All usage is tracked to your own account.</div>
-    <div class="steps-box">
-      <strong>How to get your API key</strong>
-      <ol>
-        <li>Open the <a href="https://funcapp-genie-prod.azurewebsites.us/api/aigateway-request" target="_blank">API key request portal</a></li>
-        <li>Fill in your GA email and select your department</li>
-        <li>Submit, then open the confirmation email and click "View Secret in Azure Portal"</li>
-        <li>In Azure Key Vault, open the secret under "Current Version"</li>
-        <li>Click "Show Secret Value" and copy the key (starts with sk-)</li>
-      </ol>
+  _onboardStep = 0;
+  _onboardReplay = !!replay;
+  makeOverlay('onboarding-overlay', '<div id="onboard-body" class="onboard"></div>');
+  renderOnboardStep();
+}
+
+function onboardGo(delta) {
+  _onboardStep = Math.max(0, Math.min(ONBOARD_STEPS.length - 1, _onboardStep + delta));
+  renderOnboardStep();
+}
+
+function onboardSkipToPaste() {
+  _onboardStep = ONBOARD_STEPS.length - 1;
+  renderOnboardStep();
+}
+
+function renderOnboardStep() {
+  const body = document.getElementById('onboard-body');
+  if (!body) return;
+  const s = ONBOARD_STEPS[_onboardStep];
+  const last = _onboardStep === ONBOARD_STEPS.length - 1;
+  const dots = ONBOARD_STEPS.map((_, i) =>
+    `<div class="onboard-dot ${i === _onboardStep ? 'active' : i < _onboardStep ? 'done' : ''}"></div>`).join('');
+
+  body.innerHTML = `
+    ${_onboardReplay ? `<div style="text-align:right;margin:-0.4rem -0.4rem 0 0">
+      <button class="icon-btn" onclick="closeOverlay('onboarding-overlay')" title="Close">✕</button></div>` : ''}
+    <div class="onboard-dots">${dots}</div>
+    <div class="onboard-title">${s.title}</div>
+    <div class="onboard-text">${s.text}</div>
+    ${s.img ? `<img class="onboard-img" src="${s.img}" alt="Screenshot for this step"/>` : ''}
+    ${s.portal ? `<a class="btn-primary-sm onboard-portal-btn" href="${PORTAL_URL}" target="_blank" rel="noopener">Open the API key portal ↗</a>` : ''}
+    ${s.paste ? `
+      <div style="text-align:left;max-width:420px;margin:0 auto">
+        <input type="password" class="key-input" id="onboard-key-input" placeholder="sk-..." autocomplete="off"
+               onkeydown="if(event.key==='Enter')saveApiKey('onboard')"/>
+        <div class="key-error" id="onboard-key-error"></div>
+      </div>` : ''}
+    <div class="onboard-nav">
+      <div>${_onboardStep > 0 ? `<button class="btn-plain-sm" onclick="onboardGo(-1)">← Back</button>` : ''}</div>
+      <div>
+        ${last
+          ? `<button class="btn-primary-sm" id="onboard-save-btn" onclick="saveApiKey('onboard')">Save &amp; continue</button>`
+          : `<button class="btn-primary-sm" onclick="onboardGo(1)">${s.cta || 'Next →'}</button>`}
+      </div>
     </div>
-    <label style="display:block;font-size:0.72rem;font-weight:600;color:var(--text);margin-bottom:0.4rem">Paste your API key</label>
-    <input type="password" class="key-input" id="onboard-key-input" placeholder="sk-..." autocomplete="off"/>
-    <div class="key-error" id="onboard-key-error"></div>
-    <div style="text-align:right;margin-top:1.2rem">
-      <button class="btn-primary-sm" id="onboard-save-btn" onclick="saveApiKey('onboard')">Save &amp; continue</button>
-    </div>`);
-  setTimeout(() => document.getElementById('onboard-key-input')?.focus(), 80);
+    ${s.skip ? `<a class="onboard-skip" onclick="onboardSkipToPaste()">I already have my key →</a>` : ''}`;
+  if (s.paste) setTimeout(() => document.getElementById('onboard-key-input')?.focus(), 80);
 }
 
 async function saveApiKey(prefix) {
@@ -1920,6 +2000,10 @@ async function showSettingsModal() {
       <label style="display:block;font-size:0.72rem;font-weight:600;color:var(--text);margin-bottom:0.4rem">${info ? 'Replace with a new key' : 'Add your key'}</label>
       <input type="password" class="key-input" id="settings-key-input" placeholder="sk-..." autocomplete="off"/>
       <div class="key-error" id="settings-key-error"></div>
+    </div>
+    <div style="font-size:0.7rem;margin-top:0.8rem">
+      <a style="color:var(--navy-mid);cursor:pointer;text-decoration:underline"
+         onclick="closeOverlay('settings-overlay'); showOnboardingModal(true)">🧭 Need a new key? Show me the walkthrough</a>
     </div>
     <div style="text-align:right;margin-top:1.2rem">
       <button class="btn-plain-sm" onclick="closeOverlay('settings-overlay')" style="margin-right:0.5rem">Close</button>
