@@ -44,3 +44,6 @@ chatdata.db
 *.db
 *.db-wal
 *.db-shm
+
+# Data Experts published files (admin-uploaded, never commit)
+python-service/datasets/

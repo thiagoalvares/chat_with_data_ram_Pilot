@@ -373,6 +373,14 @@
 
       <!-- Standard mode -->
       <div class="mode-panel active" id="panel-standard">
+        <div class="sidebar-section" id="experts-section" style="display:none">
+          <div class="section-label">Data Experts</div>
+          <select class="key-input" id="expert-select" onchange="expertSelectionChanged()"
+                  style="font-family:var(--inter);font-size:0.74rem;padding:0.45rem 0.6rem"></select>
+          <div class="slot-hint" id="expert-desc" style="display:block;margin:0.35rem 0 0.5rem"></div>
+          <button class="btn-primary-sm" style="width:100%" onclick="loadSelectedExpert()">Load this expert</button>
+          <div class="upload-status" id="status-expert"></div>
+        </div>
         <div class="sidebar-section">
           <div class="section-label">Data File</div>
           <div class="upload-slot">
@@ -2006,6 +2014,7 @@ async function showAdminDashboard() {
         <span>Active model:</span> <span class="model-badge">${esc(m.model_name)}</span>
         <span style="color:var(--silver);font-size:0.68rem">$${m.input_price}/M in · $${m.output_price}/M out · set by ${esc(m.set_by || 'system')}</span>
         <button class="btn-primary-sm" style="margin-left:auto;padding:0.35rem 0.8rem" onclick="showModelSelector()">Change model</button>
+        <button class="btn-primary-sm" style="padding:0.35rem 0.8rem" onclick="showExpertsManager()">Data experts</button>
       </div>
       <div class="stat-grid">
         <div class="stat-card"><div class="val">${s.total_users}</div><div class="lbl">Users</div></div>
@@ -2076,6 +2085,227 @@ document.addEventListener('DOMContentLoaded', () => {
   checkUserApiKey();
   checkAdminStatus();
 });
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Data Experts (rollout batch 2) — admin-published datasets users can question.
+// Loading an expert reuses the EXACT upload path client- and server-side.
+// ═════════════════════════════════════════════════════════════════════════════
+
+let expertsCache = [];
+
+async function refreshExperts() {
+  try {
+    const r = await fetch('/api/experts/list');
+    if (!r.ok) return;
+    const d = await r.json();
+    expertsCache = d.experts || [];
+    const section = document.getElementById('experts-section');
+    if (!expertsCache.length) { section.style.display = 'none'; return; }
+    const sel = document.getElementById('expert-select');
+    sel.innerHTML = expertsCache.map(e =>
+      `<option value="${e.id}">${esc(e.label)}</option>`).join('');
+    section.style.display = '';
+    expertSelectionChanged();
+  } catch (e) { /* feature silent if unavailable */ }
+}
+
+function expertSelectionChanged() {
+  const sel = document.getElementById('expert-select');
+  const ex = expertsCache.find(x => String(x.id) === sel.value);
+  const parts = [];
+  if (ex?.description) parts.push(esc(ex.description));
+  if (ex?.data_as_of) parts.push(`data as of ${esc(ex.data_as_of)} UTC`);
+  document.getElementById('expert-desc').innerHTML = parts.join(' · ') || '&nbsp;';
+}
+
+async function loadSelectedExpert() {
+  const sel = document.getElementById('expert-select');
+  const statusEl = document.getElementById('status-expert');
+  if (!sel.value) return;
+  setStatus(statusEl, 'Loading…', '');
+  try {
+    const r = await fetch('/api/experts/load', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expert_id: parseInt(sel.value, 10) })
+    });
+    const d = await r.json();
+    if (d.error) { setStatus(statusEl, '✗ ' + d.error, 'err'); return; }
+    // Same handling as a successful upload — everything downstream identical.
+    onUploadSuccess(d, 'standard', statusEl, d.filename);
+    const asOf = d.expert?.data_as_of ? ` · data as of ${d.expert.data_as_of} UTC` : '';
+    setStatus(statusEl, `✓ ${d.rows.toLocaleString()} rows · ${d.cols} cols${asOf}`, 'ok');
+  } catch (e) { setStatus(statusEl, '✗ ' + e.message, 'err'); }
+}
+
+// ── Admin: experts manager ────────────────────────────────────────────────────
+
+async function showExpertsManager() {
+  try {
+    const r = await fetch('/api/admin/experts/list');
+    const d = await r.json();
+    if (d.error) { alert(d.error); return; }
+    const rows = (d.experts || []).map(e => {
+      const access = e.access_mode === 'all' ? 'Everyone'
+        : `Restricted (${e.user_count} user${e.user_count === 1 ? '' : 's'}${e.allowed_groups ? ' + groups' : ''})`;
+      return `<tr>
+        <td><strong>${esc(e.label)}</strong><br><span style="font-size:0.62rem;color:var(--silver)">${esc(e.file)}${e.sheet ? ' · ' + esc(e.sheet) : ''} · ${(e.rows || 0).toLocaleString()}×${e.cols || 0}</span></td>
+        <td>${esc(access)}</td>
+        <td>${e.active ? '<span style="color:var(--success)">Active</span>' : '<span style="color:var(--silver)">Disabled</span>'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn-mini" onclick="showExpertForm(${e.id})">Edit</button>
+          <button class="btn-mini" onclick="replaceExpertFile(${e.id})">Replace file</button>
+          <button class="btn-mini" onclick="toggleExpert(${e.id}, ${e.active ? 'false' : 'true'})">${e.active ? 'Disable' : 'Enable'}</button>
+        </td>
+      </tr>`;
+    }).join('');
+    closeOverlay('experts-overlay');
+    makeOverlay('experts-overlay', `
+      <div class="modal-title">Data experts</div>
+      <div class="modal-sub">Published datasets your users can question. Files live on the server; replace a file to refresh its data.</div>
+      ${rows ? `<table class="mini-table">
+          <thead><tr><th>Expert</th><th>Access</th><th>Status</th><th></th></tr></thead>
+          <tbody>${rows}</tbody></table>`
+        : `<div style="font-size:0.74rem;color:var(--silver);margin:0.6rem 0">No data experts yet — create the first one.</div>`}
+      <div style="text-align:right;margin-top:1.1rem">
+        <button class="btn-plain-sm" onclick="closeOverlay('experts-overlay')" style="margin-right:0.5rem">Close</button>
+        <button class="btn-primary-sm" onclick="showExpertForm(null)">＋ New expert</button>
+      </div>`);
+    window._adminExperts = d.experts || [];
+  } catch (e) { alert('Could not load experts: ' + e.message); }
+}
+
+function showExpertForm(expertId) {
+  const ex = expertId ? (window._adminExperts || []).find(x => x.id === expertId) : null;
+  const isNew = !ex;
+  closeOverlay('expert-form-overlay');
+  makeOverlay('expert-form-overlay', `
+    <div class="modal-title">${isNew ? 'New data expert' : 'Edit — ' + esc(ex.label)}</div>
+    <label style="display:block;font-size:0.72rem;font-weight:600;color:var(--text);margin:0.6rem 0 0.3rem">Name *</label>
+    <input type="text" class="key-input" id="xf-label" style="font-family:var(--inter)" placeholder="e.g. AR Aging — Finance" value="${ex ? esc(ex.label) : ''}"/>
+    <label style="display:block;font-size:0.72rem;font-weight:600;color:var(--text);margin:0.6rem 0 0.3rem">Description (one line users see)</label>
+    <input type="text" class="key-input" id="xf-desc" style="font-family:var(--inter)" placeholder="e.g. Open receivables, refreshed nightly" value="${ex ? esc(ex.description) : ''}"/>
+    ${isNew ? `
+      <label style="display:block;font-size:0.72rem;font-weight:600;color:var(--text);margin:0.6rem 0 0.3rem">Data file * (.xlsx or .csv, max 50 MB)</label>
+      <input type="file" id="xf-file" accept=".csv,.xlsx,.xls" style="font-size:0.72rem;color:var(--text2)"/>
+      <label style="display:block;font-size:0.72rem;font-weight:600;color:var(--text);margin:0.6rem 0 0.3rem">Sheet (only for multi-sheet workbooks)</label>
+      <input type="text" class="key-input" id="xf-sheet" style="font-family:var(--inter)" placeholder="leave empty for CSV / single-sheet"/>` : ''}
+    <label style="display:block;font-size:0.72rem;font-weight:600;color:var(--text);margin:0.8rem 0 0.3rem">Who can use this expert?</label>
+    <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.74rem;color:var(--text);margin-bottom:0.3rem">
+      <input type="radio" name="xf-access" value="restricted" ${(!ex || ex.access_mode !== 'all') ? 'checked' : ''} onchange="xfAccessChanged()"/> Only specific people
+    </label>
+    <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.74rem;color:var(--text)">
+      <input type="radio" name="xf-access" value="all" ${(ex && ex.access_mode === 'all') ? 'checked' : ''} onchange="xfAccessChanged()"/> All app users
+    </label>
+    <div id="xf-restricted">
+      <label style="display:block;font-size:0.72rem;font-weight:600;color:var(--text);margin:0.6rem 0 0.3rem">Users <span style="font-weight:400;color:var(--silver)">(commas or one per line — paste a column from Excel)</span></label>
+      <textarea class="key-input" id="xf-users" rows="3" style="font-family:var(--inter);resize:vertical" placeholder="maria.p, john.d">${ex ? esc(ex.allowed_users) : ''}</textarea>
+      <label style="display:block;font-size:0.72rem;font-weight:600;color:var(--text);margin:0.6rem 0 0.3rem">AD groups <span style="font-weight:400;color:var(--silver)">(work once Windows sign-in is on)</span></label>
+      <input type="text" class="key-input" id="xf-groups" style="font-family:var(--inter)" placeholder="e.g. AR-Users" value="${ex ? esc(ex.allowed_groups) : ''}"/>
+    </div>
+    <label style="display:block;font-size:0.72rem;font-weight:600;color:var(--text);margin:0.8rem 0 0.3rem">Recommended questions <span style="font-weight:400;color:var(--silver)">(one per line, up to 6 — shown to users as suggestions)</span></label>
+    <textarea class="key-input" id="xf-questions" rows="4" style="font-family:var(--inter);resize:vertical" placeholder="Total open balance by customer&#10;Which invoices are 90+ days overdue?">${ex ? esc(ex.questions) : ''}</textarea>
+    <div class="key-error" id="xf-error"></div>
+    <div style="text-align:right;margin-top:1.1rem">
+      <button class="btn-plain-sm" onclick="closeOverlay('expert-form-overlay')" style="margin-right:0.5rem">Cancel</button>
+      <button class="btn-primary-sm" id="xf-save" onclick="saveExpertForm(${isNew ? 'null' : expertId})">${isNew ? 'Create expert' : 'Save changes'}</button>
+    </div>`);
+  xfAccessChanged();
+}
+
+function xfAccessChanged() {
+  const mode = document.querySelector('input[name="xf-access"]:checked')?.value;
+  document.getElementById('xf-restricted').style.display = (mode === 'all') ? 'none' : '';
+}
+
+async function saveExpertForm(expertId) {
+  const errEl = document.getElementById('xf-error');
+  const btn = document.getElementById('xf-save');
+  errEl.style.display = 'none';
+  const label = document.getElementById('xf-label').value.trim();
+  if (!label) { errEl.textContent = 'The expert needs a name.'; errEl.style.display = 'block'; return; }
+  const common = {
+    label,
+    description: document.getElementById('xf-desc').value.trim(),
+    access_mode: document.querySelector('input[name="xf-access"]:checked').value,
+    allowed_users: document.getElementById('xf-users').value.trim(),
+    allowed_groups: document.getElementById('xf-groups').value.trim(),
+    questions: document.getElementById('xf-questions').value,
+  };
+  btn.disabled = true;
+  try {
+    let r;
+    if (expertId === null) {
+      const fileInput = document.getElementById('xf-file');
+      if (!fileInput.files[0]) { errEl.textContent = 'Choose the data file.'; errEl.style.display = 'block'; btn.disabled = false; return; }
+      const fd = new FormData();
+      fd.append('file', fileInput.files[0]);
+      Object.entries(common).forEach(([k, v]) => fd.append(k, v));
+      fd.append('sheet_name', document.getElementById('xf-sheet').value.trim());
+      btn.textContent = 'Uploading…';
+      r = await fetch('/api/admin/experts/create', { method: 'POST', body: fd });
+    } else {
+      r = await fetch('/api/admin/experts/update', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expert_id: expertId, ...common })
+      });
+    }
+    const d = await r.json();
+    if (r.ok && d.success) {
+      closeOverlay('expert-form-overlay');
+      showExpertsManager();
+      refreshExperts();
+    } else {
+      errEl.textContent = d.error || 'Save failed.'; errEl.style.display = 'block';
+    }
+  } catch (e) { errEl.textContent = 'Network error: ' + e.message; errEl.style.display = 'block'; }
+  btn.disabled = false;
+  btn.textContent = expertId === null ? 'Create expert' : 'Save changes';
+}
+
+function replaceExpertFile(expertId) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.csv,.xlsx,.xls';
+  input.onchange = async () => {
+    if (!input.files[0]) return;
+    await submitExpertFile(expertId, input.files[0], '');
+  };
+  input.click();
+}
+
+async function submitExpertFile(expertId, file, sheetName) {
+  const fd = new FormData();
+  fd.append('expert_id', expertId);
+  fd.append('file', file);
+  fd.append('sheet_name', sheetName);
+  try {
+    const r = await fetch('/api/admin/experts/replace_file', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (r.ok && d.success) {
+      showExpertsManager();
+      refreshExperts();
+    } else if (d.sheets) {
+      const s = prompt(`This workbook has sheets: ${d.sheets.join(', ')}\nType the sheet name to use:`);
+      if (s) await submitExpertFile(expertId, file, s.trim());
+    } else {
+      alert(d.error || 'Replace failed.');
+    }
+  } catch (e) { alert('Network error: ' + e.message); }
+}
+
+async function toggleExpert(expertId, active) {
+  try {
+    const r = await fetch('/api/admin/experts/toggle', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expert_id: expertId, active })
+    });
+    const d = await r.json();
+    if (r.ok && d.success) { showExpertsManager(); refreshExperts(); }
+    else alert(d.error || 'Update failed.');
+  } catch (e) { alert('Network error: ' + e.message); }
+}
+
+document.addEventListener('DOMContentLoaded', () => { refreshExperts(); });
 </script>
 </body>
 </html>

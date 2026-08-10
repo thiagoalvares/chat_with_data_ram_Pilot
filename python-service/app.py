@@ -20,6 +20,7 @@ providing durable, stateless session/data storage (see README / architecture doc
 """
 
 import io
+import os
 import uuid
 from datetime import datetime, timedelta
 from typing import Any
@@ -44,6 +45,7 @@ from services.file_handler import FileHandlerError, get_excel_sheets, read_file
 from services.model_manager import (
     change_model, get_available_models, get_current_model_config, get_model_history,
 )
+from services import experts as experts_svc
 from services.report_export import build_conversation_docx
 
 api = Blueprint("api", __name__, url_prefix="/api")
@@ -75,6 +77,16 @@ def _username() -> str:
     Windows Authentication is on, otherwise the .NET host's dev fallback.
     """
     return (request.headers.get("X-User") or "unknown").strip()
+
+
+def _groups() -> list:
+    """
+    The caller's AD groups, resolved by .NET from the Windows sign-in badge
+    (only groups that Data Experts actually reference are sent). Empty when
+    auth is off, unless simulated via the .NET Auth:DevGroups setting.
+    """
+    raw = request.headers.get("X-User-Groups") or ""
+    return [g.strip() for g in raw.replace(";", ",").split(",") if g.strip()]
 
 
 @api.before_request
@@ -734,6 +746,222 @@ def admin_models_history():
     if guard:
         return guard
     return jsonify({"history": get_model_history(min(int(request.args.get("limit", 20)), 100))})
+
+
+# ── Data Experts (rollout batch 2) ────────────────────────────────────────────
+
+class _DiskFile:
+    """Wraps a stored dataset file so the EXISTING upload handler can consume it."""
+
+    def __init__(self, path: str, filename: str):
+        self._path = path
+        self.filename = filename
+
+    def read(self) -> bytes:
+        with open(self._path, "rb") as fh:
+            return fh.read()
+
+
+def _validate_expert_file(file_storage, sheet_name):
+    """
+    Parse an admin-uploaded expert file with the same reader users' uploads use.
+    Returns (df, error_response). Multi-sheet workbooks require a sheet name.
+    """
+    ext = os.path.splitext(file_storage.filename or "")[1].lower()
+    if ext not in (".xlsx", ".xls", ".csv"):
+        return None, None, (jsonify({"error": "Only .xlsx, .xls or .csv files are supported."}), 400)
+    file_bytes = file_storage.read()
+    if ext in (".xlsx", ".xls") and not sheet_name:
+        sheets = get_excel_sheets(file_bytes)
+        if len(sheets) > 1:
+            return None, None, (jsonify({
+                "error": f"This workbook has multiple sheets ({', '.join(sheets)}). "
+                         f"Enter the sheet to use in the Sheet field and try again.",
+                "sheets": sheets,
+            }), 400)
+    try:
+        df, _enc, _warn = read_file(file_bytes, file_storage.filename, sheet_name or None)
+    except FileHandlerError as e:
+        return None, None, (jsonify({"error": str(e)}), 400)
+    return df, file_bytes, None
+
+
+@api.route("/experts/list", methods=["GET"])
+def experts_list():
+    """Experts the CURRENT user may use (server-side access filter)."""
+    username = _username()
+    groups = _groups()
+    out = []
+    for e in experts_svc.experts_for_user(username, groups):
+        out.append({
+            "id": e["ExpertID"],
+            "label": e["Label"],
+            "description": e["Description"] or "",
+            "data_as_of": experts_svc.file_as_of(e),
+        })
+    return jsonify({"experts": out})
+
+
+@api.route("/experts/load", methods=["POST"])
+def experts_load():
+    """
+    Load an expert into this user's Standard slot — identical downstream
+    behavior to uploading the file (pipeline/insights/tracking untouched).
+    """
+    sid = _sid()
+    sess = get_session(sid)
+    username = _username()
+    body = request.get_json() or {}
+    expert = experts_svc.get_expert(int(body.get("expert_id", 0)))
+
+    if not expert or not expert["IsActive"] or not expert["FilePath"]:
+        return jsonify({"error": "Data expert not found."}), 404
+    if not experts_svc.user_allowed(expert, username, _groups()):
+        logger.warning(f"Expert access denied | user={username} | expert={expert['Label']}")
+        return jsonify({"error": "You don't have access to this data expert."}), 403
+    if not os.path.exists(expert["FilePath"]):
+        return jsonify({"error": "The expert's data file is missing on the server. Contact the admin."}), 500
+
+    sess.clear_history("standard")
+    disk_file = _DiskFile(expert["FilePath"], expert["OriginalFileName"] or "expert.xlsx")
+    result = _handle_upload(disk_file, "df", sess, expert["SheetName"] or None)
+    if "error" in result or result.get("needs_sheet_selection"):
+        return jsonify({"error": result.get("error", "The expert file could not be read. Contact the admin.")}), 500
+
+    # Present as the expert, not as a raw file
+    result["filename"] = expert["Label"]
+    result["expert"] = {
+        "id": expert["ExpertID"],
+        "label": expert["Label"],
+        "description": expert["Description"] or "",
+        "data_as_of": experts_svc.file_as_of(expert),
+    }
+    custom_q = experts_svc.questions_list(expert)
+    if custom_q:
+        result["suggestions"] = custom_q       # owner-authored chips win
+    sess.filename = expert["Label"]
+    save_session(sid, sess)
+    logger.info(f"Expert loaded | user={username} | expert={expert['Label']} | shape=({result['rows']},{result['cols']})")
+    return jsonify(result)
+
+
+@api.route("/experts/groups_in_use", methods=["GET"])
+def experts_groups_in_use():
+    """For the .NET layer: which AD group names should be checked on the badge."""
+    return jsonify({"groups": experts_svc.groups_in_use()})
+
+
+@api.route("/admin/experts/list", methods=["GET"])
+def admin_experts_list():
+    guard = _admin_guard()
+    if guard:
+        return guard
+    out = []
+    for e in experts_svc.all_experts():
+        out.append({
+            "id": e["ExpertID"], "label": e["Label"], "description": e["Description"] or "",
+            "file": e["OriginalFileName"] or "", "sheet": e["SheetName"] or "",
+            "rows": e["Rows"], "cols": e["Cols"],
+            "access_mode": e["AccessMode"],
+            "allowed_users": e["AllowedUsers"] or "", "allowed_groups": e["AllowedGroups"] or "",
+            "user_count": len(experts_svc.parse_list(e["AllowedUsers"] or "")),
+            "questions": e["RecommendedQuestions"] or "",
+            "active": bool(e["IsActive"]),
+            "updated_by": e["UpdatedBy"], "updated_at": e["UpdatedAt"],
+            "data_as_of": experts_svc.file_as_of(e),
+        })
+    return jsonify({"experts": out})
+
+
+@api.route("/admin/experts/create", methods=["POST"])
+def admin_experts_create():
+    guard = _admin_guard()
+    if guard:
+        return guard
+    username = _username()
+    f = request.files.get("file")
+    label = (request.form.get("label") or "").strip()
+    if not label:
+        return jsonify({"error": "The expert needs a name."}), 400
+    if not f or not f.filename:
+        return jsonify({"error": "A data file is required."}), 400
+
+    sheet_name = (request.form.get("sheet_name") or "").strip() or None
+    df, file_bytes, err = _validate_expert_file(f, sheet_name)
+    if err:
+        return err
+
+    expert_id = experts_svc.create_expert(
+        label=label,
+        description=(request.form.get("description") or "").strip(),
+        sheet_name=sheet_name,
+        access_mode=(request.form.get("access_mode") or "restricted").strip(),
+        allowed_users=(request.form.get("allowed_users") or "").strip(),
+        allowed_groups=(request.form.get("allowed_groups") or "").strip(),
+        questions=request.form.get("questions") or "",
+        rows=len(df), cols=len(df.columns),
+        created_by=username,
+    )
+    path = experts_svc.save_expert_file(expert_id, f.filename, file_bytes)
+    experts_svc.set_expert_file(expert_id, path, f.filename, sheet_name, len(df), len(df.columns), username)
+    logger.info(f"Expert created | '{label}' by {username} | {len(df)}x{len(df.columns)}")
+    return jsonify({"success": True, "id": expert_id})
+
+
+@api.route("/admin/experts/update", methods=["POST"])
+def admin_experts_update():
+    guard = _admin_guard()
+    if guard:
+        return guard
+    body = request.get_json() or {}
+    expert = experts_svc.get_expert(int(body.get("expert_id", 0)))
+    if not expert:
+        return jsonify({"error": "Expert not found"}), 404
+    label = (body.get("label") or "").strip()
+    if not label:
+        return jsonify({"error": "The expert needs a name."}), 400
+    experts_svc.update_expert(
+        expert["ExpertID"], label,
+        (body.get("description") or "").strip(),
+        (body.get("access_mode") or "restricted").strip(),
+        (body.get("allowed_users") or "").strip(),
+        (body.get("allowed_groups") or "").strip(),
+        body.get("questions") or "",
+        _username(),
+    )
+    return jsonify({"success": True})
+
+
+@api.route("/admin/experts/replace_file", methods=["POST"])
+def admin_experts_replace_file():
+    guard = _admin_guard()
+    if guard:
+        return guard
+    username = _username()
+    expert = experts_svc.get_expert(int(request.form.get("expert_id", 0)))
+    if not expert:
+        return jsonify({"error": "Expert not found"}), 404
+    f = request.files.get("file")
+    if not f or not f.filename:
+        return jsonify({"error": "A data file is required."}), 400
+    sheet_name = (request.form.get("sheet_name") or "").strip() or None
+    df, file_bytes, err = _validate_expert_file(f, sheet_name)
+    if err:
+        return err
+    path = experts_svc.save_expert_file(expert["ExpertID"], f.filename, file_bytes)
+    experts_svc.set_expert_file(expert["ExpertID"], path, f.filename, sheet_name, len(df), len(df.columns), username)
+    logger.info(f"Expert file replaced | '{expert['Label']}' by {username} | {len(df)}x{len(df.columns)}")
+    return jsonify({"success": True, "rows": len(df), "cols": len(df.columns)})
+
+
+@api.route("/admin/experts/toggle", methods=["POST"])
+def admin_experts_toggle():
+    guard = _admin_guard()
+    if guard:
+        return guard
+    body = request.get_json() or {}
+    ok = experts_svc.set_expert_active(int(body.get("expert_id", 0)), bool(body.get("active")), _username())
+    return jsonify({"success": ok})
 
 
 # ── App factory ───────────────────────────────────────────────────────────────

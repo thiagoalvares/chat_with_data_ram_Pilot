@@ -107,6 +107,17 @@ See ROLLOUT_FEATURES.md for the full write-up. Essentials:
   gateway billing). services/pricing.py is in services/ on purpose — a config/
   package would shadow config.py.
 
+## Rollout batch 2 (Aug 2026): Data Experts
+
+Admin-published datasets users can question (the RAG app's "experts", for
+tabular data). See ROLLOUT_FEATURES.md batch 2. Essentials: files in
+python-service/datasets/ (gitignored) + DataExperts table; loading reuses the
+EXACT upload path (_handle_upload via a disk-file shim) — pipeline untouched;
+access enforced server-side (users list OR AD groups via X-User-Groups, which
+.NET resolves from the Windows badge; Auth:DevGroups simulates in dev); admin
+manages everything in the admin console (create/edit/replace file/disable, up
+to 6 recommended questions that become the user's chips).
+
 ## How a request flows
 1. Browser calls .NET (`/upload/standard`, `/ask`, `/export/...`).
 2. .NET resolves the session cookie, forwards to Python with `X-Session-Id`.

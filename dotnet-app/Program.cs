@@ -56,6 +56,11 @@ var internalSecret = builder.Configuration["PythonService:InternalSecret"] ?? ""
 // authenticated name always wins.
 var devUsername = builder.Configuration["Auth:DevUsername"] ?? "";
 
+// Dev groups: simulate AD group membership while Windows Auth is off, e.g.
+// "AR-Users;HR-Analysts" — lets Data Expert group access be tested end-to-end
+// before real sign-in exists. Ignored once a user is actually authenticated.
+var devGroups = builder.Configuration["Auth:DevGroups"] ?? "";
+
 var app = builder.Build();
 
 const string SidCookie = "cwd_sid";
@@ -66,6 +71,56 @@ string GetUsername(HttpContext ctx)
     if (!string.IsNullOrEmpty(user)) return user;                 // Windows Auth
     if (!string.IsNullOrEmpty(devUsername)) return devUsername;   // dev override
     return Environment.UserName;                                  // machine user
+}
+
+// ── Data Experts: resolve which relevant AD groups the caller belongs to ─────
+// Windows sign-in already delivers the user's group memberships ("the badge").
+// We only check the badge against group names that experts actually reference —
+// that short list comes from the Python service and is cached for a minute.
+var groupsCacheLock = new object();
+List<string> groupsInUse = new();
+DateTime groupsFetchedAt = DateTime.MinValue;
+
+async Task<List<string>> GetGroupsInUse(IHttpClientFactory factory)
+{
+    lock (groupsCacheLock)
+    {
+        if ((DateTime.UtcNow - groupsFetchedAt).TotalSeconds < 60) return groupsInUse;
+    }
+    try
+    {
+        var client = factory.CreateClient("python");
+        using var req = new HttpRequestMessage(HttpMethod.Get, "/api/experts/groups_in_use");
+        if (!string.IsNullOrEmpty(internalSecret)) req.Headers.Add("X-Internal-Auth", internalSecret);
+        using var resp = await client.SendAsync(req);
+        if (resp.IsSuccessStatusCode)
+        {
+            var doc = System.Text.Json.JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+            var fresh = doc.RootElement.GetProperty("groups").EnumerateArray()
+                          .Select(g => g.GetString() ?? "").Where(g => g.Length > 0).ToList();
+            lock (groupsCacheLock) { groupsInUse = fresh; groupsFetchedAt = DateTime.UtcNow; }
+        }
+    }
+    catch { /* Python down or feature unused — treat as no groups */ }
+    lock (groupsCacheLock) return groupsInUse;
+}
+
+async Task<string> ResolveUserGroups(HttpContext ctx, IHttpClientFactory factory)
+{
+    // Authenticated: ask the Windows badge about each relevant group.
+    if (ctx.User?.Identity?.IsAuthenticated == true)
+    {
+        var relevant = await GetGroupsInUse(factory);
+        var matched = new List<string>();
+        foreach (var g in relevant)
+        {
+            try { if (ctx.User.IsInRole(g)) matched.Add(g); }
+            catch { /* unresolvable group name — skip */ }
+        }
+        return string.Join(";", matched);
+    }
+    // Not authenticated (local/dev): simulated groups, if configured.
+    return devGroups;
 }
 
 // Resolve (or create) the per-user session id and ensure the cookie is set.
@@ -85,13 +140,15 @@ string GetOrCreateSessionId(HttpContext ctx)
     return sid;
 }
 
-HttpRequestMessage NewRequest(HttpContext ctx, HttpMethod method, string path, string sid)
+HttpRequestMessage NewRequest(HttpContext ctx, HttpMethod method, string path, string sid, string userGroups = "")
 {
     var req = new HttpRequestMessage(method, path);
     req.Headers.Add("X-Session-Id", sid);
     // Always identify the user (Windows Auth name, or the dev fallback) —
     // per-user API keys and usage tracking key off this header.
     req.Headers.Add("X-User", GetUsername(ctx));
+    if (!string.IsNullOrEmpty(userGroups))
+        req.Headers.Add("X-User-Groups", userGroups);   // Data Expert group access
     if (!string.IsNullOrEmpty(internalSecret))
         req.Headers.Add("X-Internal-Auth", internalSecret);
     return req;
@@ -147,7 +204,8 @@ async Task ProxyUpload(HttpContext ctx, IHttpClientFactory factory, string targe
                 form.Add(new StringContent(val ?? string.Empty), field.Key);
     }
 
-    using var req = NewRequest(ctx, HttpMethod.Post, targetPath, sid);
+    var userGroups = await ResolveUserGroups(ctx, factory);
+    using var req = NewRequest(ctx, HttpMethod.Post, targetPath, sid, userGroups);
     req.Content = form;
     using var resp = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
     await RelayResponse(ctx, resp);
@@ -171,7 +229,8 @@ async Task ProxyJson(HttpContext ctx, IHttpClientFactory factory, string targetP
     using var reader = new StreamReader(ctx.Request.Body);
     var body = await reader.ReadToEndAsync();
 
-    using var req = NewRequest(ctx, HttpMethod.Post, targetPath, sid);
+    var userGroups = await ResolveUserGroups(ctx, factory);
+    using var req = NewRequest(ctx, HttpMethod.Post, targetPath, sid, userGroups);
     req.Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
     using var resp = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
     await RelayResponse(ctx, resp);
@@ -189,7 +248,8 @@ async Task ProxyGet(HttpContext ctx, IHttpClientFactory factory, string targetPa
     var sid = GetOrCreateSessionId(ctx);
     var client = factory.CreateClient("python");
 
-    using var req = NewRequest(ctx, HttpMethod.Get, targetPath, sid);
+    var userGroups = await ResolveUserGroups(ctx, factory);
+    using var req = NewRequest(ctx, HttpMethod.Get, targetPath, sid, userGroups);
     using var resp = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
     await RelayResponse(ctx, resp);
 }
@@ -212,6 +272,15 @@ dataEndpoints.Add(app.MapGet ("/api/admin/usage/by_model", (HttpContext ctx, IHt
 dataEndpoints.Add(app.MapGet ("/api/admin/models/available",(HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/admin/models/available")));
 dataEndpoints.Add(app.MapGet ("/api/admin/models/current", (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/admin/models/current")));
 dataEndpoints.Add(app.MapPost("/api/admin/models/select",  (HttpContext ctx, IHttpClientFactory f) => ProxyJson(ctx, f, "/api/admin/models/select")));
+// ── Data Experts (rollout batch 2) ──
+dataEndpoints.Add(app.MapGet ("/api/experts/list",           (HttpContext ctx, IHttpClientFactory f) => ProxyGet   (ctx, f, "/api/experts/list")));
+dataEndpoints.Add(app.MapPost("/api/experts/load",           (HttpContext ctx, IHttpClientFactory f) => ProxyJson  (ctx, f, "/api/experts/load")));
+dataEndpoints.Add(app.MapGet ("/api/admin/experts/list",     (HttpContext ctx, IHttpClientFactory f) => ProxyGet   (ctx, f, "/api/admin/experts/list")));
+dataEndpoints.Add(app.MapPost("/api/admin/experts/create",   (HttpContext ctx, IHttpClientFactory f) => ProxyUpload(ctx, f, "/api/admin/experts/create")));
+dataEndpoints.Add(app.MapPost("/api/admin/experts/update",   (HttpContext ctx, IHttpClientFactory f) => ProxyJson  (ctx, f, "/api/admin/experts/update")));
+dataEndpoints.Add(app.MapPost("/api/admin/experts/replace_file", (HttpContext ctx, IHttpClientFactory f) => ProxyUpload(ctx, f, "/api/admin/experts/replace_file")));
+dataEndpoints.Add(app.MapPost("/api/admin/experts/toggle",   (HttpContext ctx, IHttpClientFactory f) => ProxyJson  (ctx, f, "/api/admin/experts/toggle")));
+
 dataEndpoints.Add(app.MapGet ("/api/admin/models/history", (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/admin/models/history")));
 
 // When auth is enabled (QA/PROD), require an authenticated user on every data

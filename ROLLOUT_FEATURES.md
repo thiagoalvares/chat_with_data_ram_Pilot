@@ -112,3 +112,52 @@ changes needed then.
 - Regression: upload, chips, profile, anomalies, charts, refine, Excel export,
   Word report export, dark mode, tab persistence — all intact; zero console
   errors; golden files byte-identical.
+
+
+---
+
+# Rollout batch 2 — Data Experts (Aug 2026)
+
+The tabular twin of the RAG app's "experts": an admin publishes a governed
+Excel/CSV; an authorized population questions it in the Standard tab — no
+uploading, always the current file. Fully additive; golden core re-verified
+byte-identical after implementation.
+
+## How it works
+- **Admin console → Data experts**: create an expert (name, description, data
+  file up to the existing 50 MB limit, .xlsx/.csv, sheet for multi-sheet
+  workbooks), choose access, and optionally write up to **6 recommended
+  questions** (one per line) — these become the user's suggestion chips,
+  replacing the auto-generated ones. Edit / Replace file / Disable per row.
+  Replacing the file is how data gets refreshed.
+- **Users**: a "Data Experts" card appears in the Standard sidebar ONLY for
+  users allowed at least one expert. Pick → "Load this expert" → identical
+  experience to having uploaded the file (title shows the expert's name, plus a
+  "data as of <file timestamp>" trust line). Users with no access see nothing.
+- **Under the hood**: loading feeds the stored file through the SAME code path
+  as an upload — pipeline, insights, usage tracking, and exports untouched.
+  Files live in python-service/datasets/ (gitignored); metadata in SQLite
+  (DataExperts table).
+
+## Access control (enforced server-side on list AND load)
+- Radio per expert: **"Only specific people" (default)** or "All app users".
+- Restricted = username list (paste-friendly: commas or newlines, DOMAIN\
+  prefixes tolerated, case-insensitive) **OR AD groups**.
+- **AD groups are fully wired now**: Windows sign-in hands .NET each visitor's
+  group badge; .NET checks it against only the group names experts reference
+  (list cached from /api/experts/groups_in_use, 60 s) and forwards matches as
+  X-User-Groups. Activates automatically wherever Windows Auth is on.
+- **Testing groups before real auth**: set Auth:DevGroups in the .NET settings
+  (e.g. "AR-Users") to simulate membership — ignored once a user is genuinely
+  authenticated. X-User-Groups rides the same trust model as X-User (covered by
+  INTERNAL_API_SECRET / localhost binding).
+
+## Verified in this batch (mock gateway, full browser run)
+- Create expert with 7 questions → 6 stored (cap), file validated at publish.
+- Restricted expert invisible + load-denied (403) to outsiders; visible to a
+  listed user; visible via bare AND DOMAIN\-form group names; visible through
+  the full .NET badge path with Auth:DevGroups.
+- Load → title/status with "data as of", schema pills/profile/preview, custom
+  chips shown, ask + chart work; personal upload afterwards replaces it and
+  auto-chips return. Admin manager list/edit/access-change verified. Zero
+  console errors; golden files byte-identical.

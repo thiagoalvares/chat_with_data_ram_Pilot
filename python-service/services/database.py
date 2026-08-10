@@ -124,6 +124,26 @@ def initialize_database():
         ChangedAt TEXT NOT NULL,
         Reason TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS DataExperts (
+        ExpertID INTEGER PRIMARY KEY AUTOINCREMENT,
+        Label TEXT NOT NULL,
+        Description TEXT,
+        FilePath TEXT NOT NULL,
+        OriginalFileName TEXT,
+        SheetName TEXT,
+        AccessMode TEXT NOT NULL DEFAULT 'restricted',
+        AllowedUsers TEXT DEFAULT '',
+        AllowedGroups TEXT DEFAULT '',
+        RecommendedQuestions TEXT DEFAULT '',
+        Rows INTEGER,
+        Cols INTEGER,
+        IsActive INTEGER DEFAULT 1,
+        CreatedBy TEXT,
+        CreatedAt TEXT,
+        UpdatedBy TEXT,
+        UpdatedAt TEXT
+    );
     """
     with get_cursor() as cursor:
         cursor.executescript(schema)
