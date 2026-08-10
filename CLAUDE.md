@@ -128,6 +128,12 @@ the mock.
 - Offline: `python python-service/mock_llm.py` (:9000), then run the service with
   `LITELLM_API_BASE=http://localhost:9000 LITELLM_API_KEY=mock`.
 
+## Laptop pilot (serve testers from the dev laptop)
+`appsettings.LaptopPilot.json` + `run-laptop-pilot.ps1` + LAPTOP_PILOT.md — a
+settings profile (NOT a fork) that binds .NET to the network with Windows Auth
+ON for colleague testing while the server is being built. Python stays pinned
+to localhost in this mode. Production config is untouched.
+
 ## Run on the server (single box)
 ```
 cd python-service && pip install -r requirements.txt && python serve.py
