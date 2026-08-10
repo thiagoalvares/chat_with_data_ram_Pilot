@@ -58,11 +58,43 @@ their own usage stats — no login screens.
 - **It works** (they see the app, maybe after one login prompt): great —
   you've also just de-risked the server rollout, because this is the same
   mechanism the server will use.
-- **It doesn't** (endless login prompts / errors): open
-  `dotnet-app\appsettings.LaptopPilot.json`, change `"Enabled": true` to
-  `false`, restart the script. Everyone will then appear as **you** — one
-  shared identity and API key. All features still testable except per-person
-  usage tracking.
+- **It doesn't** (endless login prompts / errors): work through the
+  troubleshooting ladder below IN ORDER before giving up — most failures are
+  step 1 or 2.
+
+### Windows sign-in troubleshooting ladder
+
+1. **Use the laptop NAME, not the IP.** Browsers only send Windows credentials
+   automatically to "intranet-looking" addresses. `http://GA-7N38FK4:5080` can
+   sign in silently; `http://10.20.30.40:5080` usually can't. If testers used
+   an IP, switch them to the hostname first.
+2. **One login prompt is normal — fill it correctly.** If a prompt appears
+   once, enter `GA-ASI\first.last` (domain backslash username) + Windows
+   password. If that works but the prompt is annoying, the browser's intranet
+   zone just doesn't include the hostname — livable for a pilot.
+3. **Try Edge first.** It has the best automatic Windows sign-in behavior on
+   corporate machines. Chrome usually works too; other browsers vary.
+4. **Confirm the laptop is domain-joined**: run `whoami` in PowerShell — it
+   should print `GA-ASI\your.name` (a domain, not the machine name). If it
+   prints the machine name, Windows Auth cannot work in this setup — go to
+   step 7.
+5. **Check what the server is demanding**: from ANOTHER machine run
+   `curl -I http://GA-7N38FK4:5080/api/user/check_key` — a healthy response is
+   `401` with a `WWW-Authenticate: Negotiate` header. `401` with no header, or
+   a connection error, means the app/profile isn't running as expected
+   (re-check the script output says "Hosting environment: LaptopPilot").
+6. **Endless prompt loop even with correct credentials** usually means
+   Kerberos/SPN friction on a non-server machine. There's no quick laptop-side
+   fix worth chasing in a pilot — go to step 7 and note it as a question for
+   the server team (the server install with IIS handles this properly).
+7. **The graceful fallback** — open `dotnet-app\appsettings.LaptopPilot.json`,
+   change `"Enabled": true` to `false`, restart the script. Everyone then
+   appears as **you** — one shared identity and API key. All features remain
+   testable except per-person tracking; record "Windows Auth needs the server"
+   as a rollout note rather than a blocker.
+
+Whichever way it lands, the result is valuable: either sign-in is proven, or
+you've documented for the server team exactly what to configure.
 
 ---
 
