@@ -41,6 +41,18 @@ class Config(metaclass=_ConfigMeta):
     INTERNAL_API_SECRET = os.environ.get("INTERNAL_API_SECRET", "").strip()
     DB_PATH             = os.environ.get("DB_PATH", "").strip()
 
+    # ── Query-backed Data Experts: Azure + SQL Server (rollout batch 3) ──────
+    # The app's ONE Azure identity (Entra service principal, issued by ITS);
+    # all Azure-backed experts authenticate with it. Read-only by role grant.
+    AZURE_TENANT_ID     = os.environ.get("AZURE_TENANT_ID", "").strip()
+    AZURE_CLIENT_ID     = os.environ.get("AZURE_CLIENT_ID", "").strip()
+    AZURE_CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET", "").strip()
+    # SQL Server ODBC driver name as installed on the host machine.
+    ODBC_DRIVER         = os.environ.get("ODBC_DRIVER", "ODBC Driver 18 for SQL Server").strip()
+    # Cap on rows a source query may return (guards RAM; admin is told to
+    # tighten the WHERE clause).
+    DATASOURCE_MAX_ROWS = int(os.environ.get("DATASOURCE_MAX_ROWS", "500000"))
+
     # ── Flask ─────────────────────────────────────────────────────────────────
     SECRET_KEY       = os.environ.get("SECRET_KEY", os.urandom(24).hex())
     PORT             = int(os.environ.get("PORT", "5000"))

@@ -20,6 +20,7 @@ providing durable, stateless session/data storage (see README / architecture doc
 """
 
 import io
+import json
 import os
 import uuid
 from datetime import datetime, timedelta
@@ -46,6 +47,7 @@ from services.model_manager import (
     change_model, get_available_models, get_current_model_config, get_model_history,
 )
 from services import experts as experts_svc
+from services import data_sources
 from services.report_export import build_conversation_docx
 
 api = Blueprint("api", __name__, url_prefix="/api")
@@ -762,6 +764,76 @@ class _DiskFile:
             return fh.read()
 
 
+class _BytesFile:
+    """Wraps in-memory CSV bytes (a query-backed expert's fetched result) so
+    the EXISTING upload handler can consume it — same shim idea as _DiskFile."""
+
+    def __init__(self, filename: str, data: bytes):
+        self.filename = filename
+        self._data = data
+
+    def read(self) -> bytes:
+        return self._data
+
+
+def _prepare_source(body: dict, existing: dict = None):
+    """
+    Normalize an admin-submitted source definition (azure/sqlserver) into the
+    stored SourceConfig JSON. SQL-login passwords are Fernet-encrypted like user
+    API keys; an empty password on edit keeps the stored one (from `existing`).
+    Returns (source_type, config_json, sql_query, error_response).
+    """
+    source_type = (body.get("source_type") or "").strip()
+    if source_type not in ("azure", "sqlserver"):
+        return None, None, None, (jsonify({"error": "source_type must be 'azure' or 'sqlserver'."}), 400)
+    sql_query = (body.get("sql_query") or "").strip()
+    cfg_in = body.get("source_config") or {}
+
+    if source_type == "azure":
+        blobs = [{"alias": (b.get("alias") or "").strip(), "url": (b.get("url") or "").strip()}
+                 for b in (cfg_in.get("blobs") or [])]
+        config = {"blobs": blobs}
+    else:
+        config = {
+            "server": (cfg_in.get("server") or "").strip(),
+            "database": (cfg_in.get("database") or "").strip(),
+            "auth": (cfg_in.get("auth") or "windows").strip(),
+        }
+        if config["auth"] == "sql":
+            config["username"] = (cfg_in.get("username") or "").strip()
+            password = (cfg_in.get("password") or "").strip()
+            if password:
+                try:
+                    config["encrypted_password"] = encrypt_api_key(password)
+                except CryptoNotConfigured as e:
+                    return None, None, None, (jsonify({"error": str(e)}), 503)
+            elif existing:
+                prev = data_sources.parse_source_config(existing)
+                if prev.get("encrypted_password"):
+                    config["encrypted_password"] = prev["encrypted_password"]
+    return source_type, json.dumps(config), sql_query, None
+
+
+def _run_source(source_type: str, config_json: str, sql_query: str):
+    """Execute a source definition; returns (df, error_response)."""
+    try:
+        df = data_sources.fetch_dataframe(
+            {"SourceType": source_type, "SourceConfig": config_json, "SqlQuery": sql_query})
+        return df, None
+    except data_sources.DataSourceError as e:
+        return None, (jsonify({"error": str(e)}), 400)
+    except Exception as e:
+        logger.error(f"Data source query failed: {e}")
+        return None, (jsonify({"error": f"The query failed unexpectedly: {str(e)[:200]}"}), 500)
+
+
+def _public_source_config(expert: dict) -> dict:
+    """SourceConfig for the admin UI — never ship the encrypted password out."""
+    cfg = data_sources.parse_source_config(expert)
+    cfg["has_password"] = bool(cfg.pop("encrypted_password", None))
+    return cfg
+
+
 def _validate_expert_file(file_storage, sheet_name):
     """
     Parse an admin-uploaded expert file with the same reader users' uploads use.
@@ -798,6 +870,7 @@ def experts_list():
             "label": e["Label"],
             "description": e["Description"] or "",
             "data_as_of": experts_svc.file_as_of(e),
+            "source_type": experts_svc.source_type(e),
         })
     return jsonify({"experts": out})
 
@@ -814,17 +887,39 @@ def experts_load():
     body = request.get_json() or {}
     expert = experts_svc.get_expert(int(body.get("expert_id", 0)))
 
-    if not expert or not expert["IsActive"] or not expert["FilePath"]:
+    if not expert or not expert["IsActive"] or not experts_svc.is_loadable(expert):
         return jsonify({"error": "Data expert not found."}), 404
     if not experts_svc.user_allowed(expert, username, _groups()):
         logger.warning(f"Expert access denied | user={username} | expert={expert['Label']}")
         return jsonify({"error": "You don't have access to this data expert."}), 403
-    if not os.path.exists(expert["FilePath"]):
-        return jsonify({"error": "The expert's data file is missing on the server. Contact the admin."}), 500
 
-    sess.clear_history("standard")
-    disk_file = _DiskFile(expert["FilePath"], expert["OriginalFileName"] or "expert.xlsx")
-    result = _handle_upload(disk_file, "df", sess, expert["SheetName"] or None)
+    source_type = experts_svc.source_type(expert)
+    if source_type == "file":
+        if not os.path.exists(expert["FilePath"]):
+            return jsonify({"error": "The expert's data file is missing on the server. Contact the admin."}), 500
+        sess.clear_history("standard")
+        disk_file = _DiskFile(expert["FilePath"], expert["OriginalFileName"] or "expert.xlsx")
+        result = _handle_upload(disk_file, "df", sess, expert["SheetName"] or None)
+        data_as_of = experts_svc.file_as_of(expert)
+    else:
+        # Query-backed expert (azure/sqlserver): fetch live, then feed the
+        # result through the SAME upload path as a CSV — pipeline untouched.
+        try:
+            df = data_sources.fetch_dataframe(expert)
+        except data_sources.DataSourceError as e:
+            logger.warning(f"Expert source fetch failed | {expert['Label']} | {e}")
+            return jsonify({"error": str(e)}), 502
+        except Exception as e:
+            logger.error(f"Expert source fetch failed | {expert['Label']} | {e}")
+            return jsonify({"error": "The expert's data source could not be read. Contact the admin."}), 502
+        csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
+        if len(csv_bytes) > Config.MAX_FILE_BYTES:
+            return jsonify({"error": f"The query result exceeds the {Config.MAX_FILE_SIZE_MB} MB "
+                                     f"working limit — the admin should tighten the SQL."}), 502
+        sess.clear_history("standard")
+        result = _handle_upload(_BytesFile(f"{expert['Label']}.csv", csv_bytes), "df", sess, None)
+        data_as_of = datetime.utcnow().strftime("%Y-%m-%d %H:%M")  # fetched just now
+
     if "error" in result or result.get("needs_sheet_selection"):
         return jsonify({"error": result.get("error", "The expert file could not be read. Contact the admin.")}), 500
 
@@ -834,7 +929,8 @@ def experts_load():
         "id": expert["ExpertID"],
         "label": expert["Label"],
         "description": expert["Description"] or "",
-        "data_as_of": experts_svc.file_as_of(expert),
+        "data_as_of": data_as_of,
+        "source_type": source_type,
     }
     custom_q = experts_svc.questions_list(expert)
     if custom_q:
@@ -869,6 +965,9 @@ def admin_experts_list():
             "active": bool(e["IsActive"]),
             "updated_by": e["UpdatedBy"], "updated_at": e["UpdatedAt"],
             "data_as_of": experts_svc.file_as_of(e),
+            "source_type": experts_svc.source_type(e),
+            "source_config": _public_source_config(e),
+            "sql_query": e.get("SqlQuery") or "",
         })
     return jsonify({"experts": out})
 
@@ -920,6 +1019,21 @@ def admin_experts_update():
     label = (body.get("label") or "").strip()
     if not label:
         return jsonify({"error": "The expert needs a name."}), 400
+
+    # Query-backed experts may also update their source definition. The new
+    # definition is executed once before saving, so a broken SQL/URL never
+    # replaces a working one (and Rows/Cols stay honest).
+    if experts_svc.source_type(expert) != "file" and ("source_config" in body or "sql_query" in body):
+        body.setdefault("source_type", experts_svc.source_type(expert))
+        st, cfg_json, sql_query, err = _prepare_source(body, existing=expert)
+        if err:
+            return err
+        df, err = _run_source(st, cfg_json, sql_query)
+        if err:
+            return err
+        experts_svc.update_expert_source(expert["ExpertID"], cfg_json, sql_query,
+                                         len(df), len(df.columns), _username())
+
     experts_svc.update_expert(
         expert["ExpertID"], label,
         (body.get("description") or "").strip(),
@@ -930,6 +1044,64 @@ def admin_experts_update():
         _username(),
     )
     return jsonify({"success": True})
+
+
+@api.route("/admin/experts/test_query", methods=["POST"])
+def admin_experts_test_query():
+    """
+    Run a source definition WITHOUT saving anything or touching any session —
+    the admin console's 'Test query' button. Returns a preview so the admin can
+    confirm the data looks right before creating/saving the expert.
+    """
+    guard = _admin_guard()
+    if guard:
+        return guard
+    body = request.get_json() or {}
+    existing = experts_svc.get_expert(int(body.get("expert_id") or 0)) if body.get("expert_id") else None
+    st, cfg_json, sql_query, err = _prepare_source(body, existing=existing)
+    if err:
+        return err
+    df, err = _run_source(st, cfg_json, sql_query)
+    if err:
+        return err
+    preview = df.head(5).fillna("").astype(str).replace("nan", "").to_dict(orient="records")
+    return jsonify({"ok": True, "rows": len(df), "cols": len(df.columns),
+                    "columns": [str(c) for c in df.columns], "preview": preview})
+
+
+@api.route("/admin/experts/create_query", methods=["POST"])
+def admin_experts_create_query():
+    """Create a query-backed expert (azure/sqlserver). The definition is
+    executed once to validate it and record Rows/Cols."""
+    guard = _admin_guard()
+    if guard:
+        return guard
+    username = _username()
+    body = request.get_json() or {}
+    label = (body.get("label") or "").strip()
+    if not label:
+        return jsonify({"error": "The expert needs a name."}), 400
+    st, cfg_json, sql_query, err = _prepare_source(body)
+    if err:
+        return err
+    df, err = _run_source(st, cfg_json, sql_query)
+    if err:
+        return err
+    expert_id = experts_svc.create_query_expert(
+        label=label,
+        description=(body.get("description") or "").strip(),
+        source_type_=st,
+        source_config_json=cfg_json,
+        sql_query=sql_query,
+        access_mode=(body.get("access_mode") or "restricted").strip(),
+        allowed_users=(body.get("allowed_users") or "").strip(),
+        allowed_groups=(body.get("allowed_groups") or "").strip(),
+        questions=body.get("questions") or "",
+        rows=len(df), cols=len(df.columns),
+        created_by=username,
+    )
+    logger.info(f"Query expert created | '{label}' ({st}) by {username} | {len(df)}x{len(df.columns)}")
+    return jsonify({"success": True, "id": expert_id, "rows": len(df), "cols": len(df.columns)})
 
 
 @api.route("/admin/experts/replace_file", methods=["POST"])

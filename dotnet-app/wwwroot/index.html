@@ -107,6 +107,7 @@
     .header-left { display: flex; align-items: center; gap: 0.8rem; }
     .main-title { font-size: 0.78rem; font-weight: 600; color: var(--text); }
     .mode-badge { font-size: 0.6rem; font-weight: 600; padding: 0.18rem 0.6rem; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.08em; background: var(--navy); color: #fff; }
+    .live-badge { font-size: 0.6rem; font-weight: 700; padding: 0.18rem 0.6rem; border-radius: 3px; letter-spacing: 0.05em; background: linear-gradient(90deg, #0F6CBD, #00BCF2); color: #fff; white-space: nowrap; }
     .mode-badge.variance  { background: var(--navy-mid); }
     .mode-badge.msproject { background: #1a4a3a; }
 
@@ -454,6 +455,7 @@
       <div class="header-left">
         <div class="main-title" id="main-title">No data loaded</div>
         <div class="mode-badge" id="mode-badge">Standard</div>
+        <div class="live-badge" id="live-badge" style="display:none" title="This workspace is connected to live corporate data sources"></div>
       </div>
       <div class="header-actions">
         <div class="view-tabs">
@@ -2099,6 +2101,15 @@ async function refreshExperts() {
     if (!r.ok) return;
     const d = await r.json();
     expertsCache = d.experts || [];
+    // "Integrated" badge: shown whenever a live (query-backed) expert exists.
+    const badge = document.getElementById('live-badge');
+    if (badge) {
+      const hasAzure = expertsCache.some(e => e.source_type === 'azure');
+      const hasSql   = expertsCache.some(e => e.source_type === 'sqlserver');
+      if (hasAzure)    { badge.textContent = '⚡ Azure integrated'; badge.style.display = ''; }
+      else if (hasSql) { badge.textContent = '⚡ SQL Server integrated'; badge.style.display = ''; }
+      else badge.style.display = 'none';
+    }
     const section = document.getElementById('experts-section');
     if (!expertsCache.length) { section.style.display = 'none'; return; }
     const sel = document.getElementById('expert-select');
@@ -2114,7 +2125,9 @@ function expertSelectionChanged() {
   const ex = expertsCache.find(x => String(x.id) === sel.value);
   const parts = [];
   if (ex?.description) parts.push(esc(ex.description));
-  if (ex?.data_as_of) parts.push(`data as of ${esc(ex.data_as_of)} UTC`);
+  if (ex?.source_type === 'azure') parts.push('⚡ live from Azure');
+  else if (ex?.source_type === 'sqlserver') parts.push('⚡ live from SQL Server');
+  else if (ex?.data_as_of) parts.push(`data as of ${esc(ex.data_as_of)} UTC`);
   document.getElementById('expert-desc').innerHTML = parts.join(' · ') || '&nbsp;';
 }
 
@@ -2147,13 +2160,17 @@ async function showExpertsManager() {
     const rows = (d.experts || []).map(e => {
       const access = e.access_mode === 'all' ? 'Everyone'
         : `Restricted (${e.user_count} user${e.user_count === 1 ? '' : 's'}${e.allowed_groups ? ' + groups' : ''})`;
+      const isQuery = e.source_type && e.source_type !== 'file';
+      const srcInfo = e.source_type === 'azure' ? '⚡ Azure · live query'
+        : e.source_type === 'sqlserver' ? '⚡ SQL Server · live query'
+        : `${esc(e.file)}${e.sheet ? ' · ' + esc(e.sheet) : ''}`;
       return `<tr>
-        <td><strong>${esc(e.label)}</strong><br><span style="font-size:0.62rem;color:var(--silver)">${esc(e.file)}${e.sheet ? ' · ' + esc(e.sheet) : ''} · ${(e.rows || 0).toLocaleString()}×${e.cols || 0}</span></td>
+        <td><strong>${esc(e.label)}</strong><br><span style="font-size:0.62rem;color:var(--silver)">${srcInfo} · ${(e.rows || 0).toLocaleString()}×${e.cols || 0}</span></td>
         <td>${esc(access)}</td>
         <td>${e.active ? '<span style="color:var(--success)">Active</span>' : '<span style="color:var(--silver)">Disabled</span>'}</td>
         <td style="white-space:nowrap">
           <button class="btn-mini" onclick="showExpertForm(${e.id})">Edit</button>
-          <button class="btn-mini" onclick="replaceExpertFile(${e.id})">Replace file</button>
+          ${isQuery ? '' : `<button class="btn-mini" onclick="replaceExpertFile(${e.id})">Replace file</button>`}
           <button class="btn-mini" onclick="toggleExpert(${e.id}, ${e.active ? 'false' : 'true'})">${e.active ? 'Disable' : 'Enable'}</button>
         </td>
       </tr>`;
@@ -2177,18 +2194,64 @@ async function showExpertsManager() {
 function showExpertForm(expertId) {
   const ex = expertId ? (window._adminExperts || []).find(x => x.id === expertId) : null;
   const isNew = !ex;
+  const srcType = ex ? (ex.source_type || 'file') : 'file';
+  const cfg = (ex && ex.source_config) || {};
+  const blobLines = (cfg.blobs || []).map(b => `${b.alias} = ${b.url}`).join('\n');
+  const lbl = 'display:block;font-size:0.72rem;font-weight:600;color:var(--text);margin:0.6rem 0 0.3rem';
   closeOverlay('expert-form-overlay');
   makeOverlay('expert-form-overlay', `
     <div class="modal-title">${isNew ? 'New data expert' : 'Edit — ' + esc(ex.label)}</div>
-    <label style="display:block;font-size:0.72rem;font-weight:600;color:var(--text);margin:0.6rem 0 0.3rem">Name *</label>
+    ${isNew ? `
+      <label style="${lbl}">Data source *</label>
+      <div style="display:flex;gap:1.1rem;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.74rem;color:var(--text)">
+          <input type="radio" name="xf-source" value="file" checked onchange="xfSourceChanged()"/> Upload a file</label>
+        <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.74rem;color:var(--text)">
+          <input type="radio" name="xf-source" value="azure" onchange="xfSourceChanged()"/> ⚡ Azure (lake/blob)</label>
+        <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.74rem;color:var(--text)">
+          <input type="radio" name="xf-source" value="sqlserver" onchange="xfSourceChanged()"/> ⚡ SQL Server</label>
+      </div>`
+    : (srcType !== 'file' ? `<div class="modal-sub">${srcType === 'azure' ? '⚡ Azure — fetched live on every load' : '⚡ SQL Server — fetched live on every load'}</div>` : '')}
+    <label style="${lbl}">Name *</label>
     <input type="text" class="key-input" id="xf-label" style="font-family:var(--inter)" placeholder="e.g. AR Aging — Finance" value="${ex ? esc(ex.label) : ''}"/>
-    <label style="display:block;font-size:0.72rem;font-weight:600;color:var(--text);margin:0.6rem 0 0.3rem">Description (one line users see)</label>
+    <label style="${lbl}">Description (one line users see)</label>
     <input type="text" class="key-input" id="xf-desc" style="font-family:var(--inter)" placeholder="e.g. Open receivables, refreshed nightly" value="${ex ? esc(ex.description) : ''}"/>
     ${isNew ? `
-      <label style="display:block;font-size:0.72rem;font-weight:600;color:var(--text);margin:0.6rem 0 0.3rem">Data file * (.xlsx or .csv, max 50 MB)</label>
+    <div id="xf-src-file">
+      <label style="${lbl}">Data file * (.xlsx or .csv, max 50 MB)</label>
       <input type="file" id="xf-file" accept=".csv,.xlsx,.xls" style="font-size:0.72rem;color:var(--text2)"/>
-      <label style="display:block;font-size:0.72rem;font-weight:600;color:var(--text);margin:0.6rem 0 0.3rem">Sheet (only for multi-sheet workbooks)</label>
-      <input type="text" class="key-input" id="xf-sheet" style="font-family:var(--inter)" placeholder="leave empty for CSV / single-sheet"/>` : ''}
+      <label style="${lbl}">Sheet (only for multi-sheet workbooks)</label>
+      <input type="text" class="key-input" id="xf-sheet" style="font-family:var(--inter)" placeholder="leave empty for CSV / single-sheet"/>
+    </div>` : ''}
+    <div id="xf-src-azure" style="display:none">
+      <label style="${lbl}">Blobs * <span style="font-weight:400;color:var(--silver)">(one per line: alias = URL — the alias becomes the table name in your SQL)</span></label>
+      <textarea class="key-input" id="xf-blobs" rows="3" style="font-family:var(--mono);font-size:0.68rem;resize:vertical" placeholder="costs = https://account.blob.core.windows.net/container/costs.parquet">${esc(blobLines)}</textarea>
+    </div>
+    <div id="xf-src-sqlserver" style="display:none">
+      <label style="${lbl}">Server *</label>
+      <input type="text" class="key-input" id="xf-server" style="font-family:var(--inter)" placeholder="e.g. GASQL01 or server.database.windows.net" value="${esc(cfg.server || '')}"/>
+      <label style="${lbl}">Database *</label>
+      <input type="text" class="key-input" id="xf-database" style="font-family:var(--inter)" placeholder="e.g. FinanceDW" value="${esc(cfg.database || '')}"/>
+      <label style="${lbl}">Authentication</label>
+      <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.74rem;color:var(--text);margin-bottom:0.3rem">
+        <input type="radio" name="xf-sqlauth" value="windows" ${cfg.auth !== 'sql' ? 'checked' : ''} onchange="xfSqlAuthChanged()"/> Windows (the app's service account)</label>
+      <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.74rem;color:var(--text)">
+        <input type="radio" name="xf-sqlauth" value="sql" ${cfg.auth === 'sql' ? 'checked' : ''} onchange="xfSqlAuthChanged()"/> SQL login (dev/testing)</label>
+      <div id="xf-sqllogin" style="display:none">
+        <label style="${lbl}">Username</label>
+        <input type="text" class="key-input" id="xf-sqluser" style="font-family:var(--inter)" value="${esc(cfg.username || '')}"/>
+        <label style="${lbl}">Password ${cfg.has_password ? '<span style="font-weight:400;color:var(--silver)">(leave empty to keep the saved one)</span>' : ''}</label>
+        <input type="password" class="key-input" id="xf-sqlpass" style="font-family:var(--inter)" autocomplete="new-password"/>
+      </div>
+    </div>
+    <div id="xf-src-query" style="display:none">
+      <label style="${lbl}">SQL statement <span style="font-weight:400;color:var(--silver)" id="xf-sql-hint"></span></label>
+      <textarea class="key-input" id="xf-sql" rows="4" style="font-family:var(--mono);font-size:0.68rem;resize:vertical" placeholder="SELECT Program, FiscalYear, SUM(Amount) AS Total&#10;FROM costs WHERE FiscalYear = 2026&#10;GROUP BY Program, FiscalYear">${ex ? esc(ex.sql_query || '') : ''}</textarea>
+      <div style="margin-top:0.4rem">
+        <button class="btn-plain-sm" id="xf-test" onclick="testExpertQuery(${isNew ? 'null' : expertId})">▶ Test query</button>
+        <span id="xf-testresult" style="font-size:0.7rem;margin-left:0.5rem"></span>
+      </div>
+    </div>
     <label style="display:block;font-size:0.72rem;font-weight:600;color:var(--text);margin:0.8rem 0 0.3rem">Who can use this expert?</label>
     <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.74rem;color:var(--text);margin-bottom:0.3rem">
       <input type="radio" name="xf-access" value="restricted" ${(!ex || ex.access_mode !== 'all') ? 'checked' : ''} onchange="xfAccessChanged()"/> Only specific people
@@ -2209,12 +2272,105 @@ function showExpertForm(expertId) {
       <button class="btn-plain-sm" onclick="closeOverlay('expert-form-overlay')" style="margin-right:0.5rem">Cancel</button>
       <button class="btn-primary-sm" id="xf-save" onclick="saveExpertForm(${isNew ? 'null' : expertId})">${isNew ? 'Create expert' : 'Save changes'}</button>
     </div>`);
+  window._xfIsNew = isNew;
+  window._xfFixedSource = isNew ? null : srcType;   // source type is set at creation
   xfAccessChanged();
+  xfSourceChanged();
+  xfSqlAuthChanged();
 }
 
 function xfAccessChanged() {
   const mode = document.querySelector('input[name="xf-access"]:checked')?.value;
   document.getElementById('xf-restricted').style.display = (mode === 'all') ? 'none' : '';
+}
+
+function xfCurrentSource() {
+  return window._xfFixedSource
+    || document.querySelector('input[name="xf-source"]:checked')?.value
+    || 'file';
+}
+
+function xfSourceChanged() {
+  const src = xfCurrentSource();
+  const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+  show('xf-src-file', src === 'file');
+  show('xf-src-azure', src === 'azure');
+  show('xf-src-sqlserver', src === 'sqlserver');
+  show('xf-src-query', src === 'azure' || src === 'sqlserver');
+  const hint = document.getElementById('xf-sql-hint');
+  if (hint) hint.textContent = src === 'azure'
+    ? '(optional with a single blob — required to combine several)'
+    : '(required — the database runs it; only the result travels)';
+  const testOut = document.getElementById('xf-testresult');
+  if (testOut) testOut.textContent = '';
+}
+
+function xfSqlAuthChanged() {
+  const auth = document.querySelector('input[name="xf-sqlauth"]:checked')?.value;
+  const el = document.getElementById('xf-sqllogin');
+  if (el) el.style.display = (auth === 'sql') ? '' : 'none';
+}
+
+// Read the source definition out of the form → {source_type, source_config, sql_query}.
+// Throws with a human message when something obvious is missing.
+function xfCollectSource() {
+  const src = xfCurrentSource();
+  const sql = document.getElementById('xf-sql')?.value.trim() || '';
+  if (src === 'azure') {
+    const lines = (document.getElementById('xf-blobs')?.value || '').split('\n').map(l => l.trim()).filter(Boolean);
+    if (!lines.length) throw new Error('Add at least one blob line: alias = URL');
+    const blobs = lines.map(line => {
+      const i = line.indexOf('=');
+      if (i < 1) throw new Error(`Each blob line must be "alias = URL" — check: ${line.slice(0, 60)}`);
+      return { alias: line.slice(0, i).trim(), url: line.slice(i + 1).trim() };
+    });
+    return { source_type: 'azure', source_config: { blobs }, sql_query: sql };
+  }
+  if (src === 'sqlserver') {
+    const cfg = {
+      server: document.getElementById('xf-server')?.value.trim() || '',
+      database: document.getElementById('xf-database')?.value.trim() || '',
+      auth: document.querySelector('input[name="xf-sqlauth"]:checked')?.value || 'windows',
+    };
+    if (!cfg.server || !cfg.database) throw new Error('Server and database are required.');
+    if (cfg.auth === 'sql') {
+      cfg.username = document.getElementById('xf-sqluser')?.value.trim() || '';
+      const pass = document.getElementById('xf-sqlpass')?.value || '';
+      if (pass) cfg.password = pass;
+    }
+    if (!sql) throw new Error('A SQL statement is required for SQL Server.');
+    return { source_type: 'sqlserver', source_config: cfg, sql_query: sql };
+  }
+  throw new Error('Not a query-backed source.');
+}
+
+async function testExpertQuery(expertId) {
+  const out = document.getElementById('xf-testresult');
+  const btn = document.getElementById('xf-test');
+  out.style.color = 'var(--silver)';
+  try {
+    const payload = xfCollectSource();
+    if (expertId) payload.expert_id = expertId;   // reuse the saved SQL password if not re-entered
+    out.textContent = 'Running…';
+    btn.disabled = true;
+    const r = await fetch('/api/admin/experts/test_query', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const d = await r.json();
+    if (r.ok && d.ok) {
+      const cols = d.columns.slice(0, 8).join(', ') + (d.columns.length > 8 ? '…' : '');
+      out.style.color = 'var(--success)';
+      out.textContent = `✓ ${d.rows.toLocaleString()} rows × ${d.cols} cols — ${cols}`;
+    } else {
+      out.style.color = 'var(--danger, #c0392b)';
+      out.textContent = '✗ ' + (d.error || 'Test failed.');
+    }
+  } catch (e) {
+    out.style.color = 'var(--danger, #c0392b)';
+    out.textContent = '✗ ' + e.message;
+  }
+  btn.disabled = false;
 }
 
 async function saveExpertForm(expertId) {
@@ -2231,10 +2387,31 @@ async function saveExpertForm(expertId) {
     allowed_groups: document.getElementById('xf-groups').value.trim(),
     questions: document.getElementById('xf-questions').value,
   };
+  const src = xfCurrentSource();
   btn.disabled = true;
   try {
     let r;
-    if (expertId === null) {
+    if (src !== 'file') {
+      // Query-backed expert (azure/sqlserver) — the server runs the query once
+      // to validate before saving, so this can take a few seconds.
+      let payload;
+      try { payload = xfCollectSource(); }
+      catch (e) { errEl.textContent = e.message; errEl.style.display = 'block'; btn.disabled = false; return; }
+      Object.assign(payload, common);
+      btn.textContent = 'Running query…';
+      if (expertId === null) {
+        r = await fetch('/api/admin/experts/create_query', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        payload.expert_id = expertId;
+        r = await fetch('/api/admin/experts/update', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+    } else if (expertId === null) {
       const fileInput = document.getElementById('xf-file');
       if (!fileInput.files[0]) { errEl.textContent = 'Choose the data file.'; errEl.style.display = 'block'; btn.disabled = false; return; }
       const fd = new FormData();

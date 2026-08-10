@@ -142,11 +142,24 @@ def initialize_database():
         CreatedBy TEXT,
         CreatedAt TEXT,
         UpdatedBy TEXT,
-        UpdatedAt TEXT
+        UpdatedAt TEXT,
+        SourceType TEXT NOT NULL DEFAULT 'file',
+        SourceConfig TEXT DEFAULT '',
+        SqlQuery TEXT DEFAULT ''
     );
     """
     with get_cursor() as cursor:
         cursor.executescript(schema)
+        # Migrate pre-batch-3 databases: add the query-source columns in place.
+        cursor.execute("PRAGMA table_info(DataExperts)")
+        existing_cols = {row[1] for row in cursor.fetchall()}
+        for col, ddl in (
+            ("SourceType", "TEXT NOT NULL DEFAULT 'file'"),
+            ("SourceConfig", "TEXT DEFAULT ''"),
+            ("SqlQuery", "TEXT DEFAULT ''"),
+        ):
+            if col not in existing_cols:
+                cursor.execute(f"ALTER TABLE DataExperts ADD COLUMN {col} {ddl}")
         cursor.execute("SELECT COUNT(*) FROM ModelConfig WHERE IsActive = 1")
         if cursor.fetchone()[0] == 0:
             cursor.execute(

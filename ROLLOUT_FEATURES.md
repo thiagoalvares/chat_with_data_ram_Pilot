@@ -161,3 +161,94 @@ byte-identical after implementation.
   chips shown, ask + chart work; personal upload afterwards replaces it and
   auto-chips return. Admin manager list/edit/access-change verified. Zero
   console errors; golden files byte-identical.
+
+
+---
+
+# Rollout batch 3 — Live data sources: Azure + SQL Server (Aug 2026)
+
+Data Experts can now be **query-backed** instead of file-backed: the admin
+points an expert at Azure blob storage (data lake files) or a SQL Server /
+Azure SQL database with a SQL statement, and users load it exactly like any
+other expert — except the data is **fetched live on every load**. Fully
+additive; golden core re-verified byte-identical after implementation.
+
+## How it works
+- **Admin console → Data experts → New expert** now offers three sources:
+  *Upload a file* (unchanged), *⚡ Azure (lake/blob)*, *⚡ SQL Server*.
+- **Azure**: one or more blobs, each `alias = https://…` (parquet/csv/xlsx).
+  The app downloads them with its service principal and runs the admin's SQL
+  locally with **DuckDB**, each blob visible as a table named by its alias —
+  joins across several blobs work like in a database. SQL optional for a
+  single blob (defaults to `SELECT *`).
+- **SQL Server / Azure SQL**: server + database + SQL statement. The
+  **database executes the SQL** — only the result travels, so a WHERE clause
+  against a 40M-row table pulls just the matching rows. Auth: **Windows**
+  (default — the identity the Python service runs as, i.e. the ITS service
+  account/gMSA; no password stored anywhere) or **SQL login** (dev/testing;
+  password Fernet-encrypted like user API keys, never returned to the UI).
+- **▶ Test query** in the form runs the definition without saving and shows
+  rows × cols + column names. Create/Save also executes the definition once,
+  so a broken query never replaces a working one.
+- **Load path**: fetched result → CSV bytes → the SAME `_handle_upload` shim
+  as file experts → pipeline, insights, chips, tracking all untouched. The
+  user's trust line shows "data as of <just now>" because it IS just fetched.
+- **⚡ Azure integrated / ⚡ SQL Server integrated** badge appears in the
+  header whenever the signed-in user can see at least one live expert.
+
+## New/changed pieces
+- `python-service/services/data_sources.py` — NEW: both adapters + guards;
+  azure/duckdb/pyodbc imports are lazy so the service runs without them.
+- `app.py` — `/admin/experts/create_query`, `/admin/experts/test_query`,
+  update extended for source edits, load branch for query experts.
+- `services/experts.py` — query-expert CRUD, `is_loadable`, `source_type`.
+- `services/database.py` — DataExperts + SourceType/SourceConfig/SqlQuery
+  (auto-migrates existing DBs in place).
+- `dotnet-app/Program.cs` — two proxy routes. `index.html` — form, badge.
+- `requirements.txt` — duckdb, azure-identity, azure-storage-blob, pyodbc.
+
+## Configuration (python-service/.env)
+- `AZURE_TENANT_ID` / `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` — the app's
+  ONE Entra service principal (ask ITS for an app registration with the
+  read-only **Storage Blob Data Reader** role on the containers used). Until
+  set, Azure experts fail with a clear message; everything else unaffected.
+- `ODBC_DRIVER` — installed SQL Server ODBC driver name (default
+  "ODBC Driver 18 for SQL Server"; the driver itself is a host install —
+  standard on Windows servers, `pyodbc` also needs it present).
+- `DATASOURCE_MAX_ROWS` (default 500000) — row cap on query results; over it
+  the admin is told to tighten the WHERE clause. Results are also capped by
+  the existing 50 MB working limit at load time.
+
+## ⚠️ SECURITY / ITS NOTES
+1. **New egress destinations** (inbound data only — nothing from user
+   sessions is sent): `login.microsoftonline.com` + the storage account host
+   (Azure), and the database host (SQL Server). Add to the firewall egress
+   allowlist alongside the LLM gateway when it's enabled.
+2. Ask ITS for: an **Entra app registration** (client secret; note secrets
+   expire — typically 6–24 months) with Storage Blob Data Reader, and/or a
+   **service account/gMSA** for the Windows service with `db_datareader` on
+   the source databases. Both identities are read-only by construction.
+3. Admin-authored SQL runs with the app's read-only identities. Admins are
+   already trusted (they publish data experts); no new trust tier.
+4. The DB sees ONE identity (the app's), not individual users — per-person
+   access control stays in the Data Experts access rules, as today.
+
+## Verified in this batch (offline harness + mock gateway, full browser run)
+- 28/28 automated checks: DuckDB join across parquet+csv via aliases; single
+  blob defaults to SELECT *; bad SQL / bad alias / row-cap / empty-result all
+  produce friendly admin errors; DB auto-migration adds the new columns; full
+  create_query → list → load-through-shim → insights/chips path (fetch
+  stubbed); update re-runs the query before saving; restricted query expert
+  403s outsiders; live fetch failure → clean 502; SQL password encrypted at
+  rest, kept on empty re-save, masked in admin list; non-admin 403 on new
+  endpoints; file experts fully regression-tested.
+- Browser: three-source form renders; Azure/SQL Server field sets + contextual
+  hints; Test query round-trips through .NET and shows the friendly
+  "Azure is not configured" error; header badge appears with a live expert
+  and disappears without; sidebar shows "⚡ live from Azure"; load failure
+  shows the admin-facing reason; file expert load + mock ask + chart + v2
+  actions all intact. Golden files byte-identical (`git diff` clean on all 5).
+- NOT yet exercised (needs real credentials/hosts): an actual Azure download
+  and an actual SQL Server connection. The Windows-auth path must be tested
+  on a domain-joined Windows machine (Trusted_Connection uses the service's
+  own identity; macOS dev uses the SQL-login option).

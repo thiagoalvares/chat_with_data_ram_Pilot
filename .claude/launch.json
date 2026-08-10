@@ -1,0 +1,25 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mock-llm",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": ["mock_llm.py"],
+      "cwd": "python-service",
+      "port": 9000
+    },
+    {
+      "name": "python-service",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": ["app.py"],
+      "cwd": "python-service",
+      "port": 8000
+    },
+    {
+      "name": "app",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "dotnet-app"],
+      "port": 5080
+    }
+  ]
+}

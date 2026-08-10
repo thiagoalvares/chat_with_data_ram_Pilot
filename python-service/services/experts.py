@@ -89,13 +89,27 @@ def save_expert_file(expert_id: int, original_name: str, file_bytes: bytes) -> s
 
 
 def file_as_of(expert: Dict[str, Any]) -> Optional[str]:
-    """The data-freshness stamp: the stored file's modification time (UTC)."""
+    """The data-freshness stamp: the stored file's modification time (UTC).
+    Query-backed experts have no stored file — they fetch live on every load."""
+    if source_type(expert) != "file":
+        return None
     try:
         from datetime import datetime
         ts = os.path.getmtime(expert["FilePath"])
         return datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
     except Exception:
         return None
+
+
+def source_type(expert: Dict[str, Any]) -> str:
+    return (expert.get("SourceType") or "file").strip() or "file"
+
+
+def is_loadable(expert: Dict[str, Any]) -> bool:
+    """File experts need their stored file; query experts need their definition."""
+    if source_type(expert) == "file":
+        return bool(expert.get("FilePath"))
+    return bool(expert.get("SourceConfig"))
 
 
 # ── CRUD ──────────────────────────────────────────────────────────────────────
@@ -114,6 +128,36 @@ def create_expert(label, description, sheet_name, access_mode, allowed_users,
              created_by, now_utc(), created_by, now_utc()),
         )
         return cur.lastrowid
+
+
+def create_query_expert(label, description, source_type_, source_config_json, sql_query,
+                        access_mode, allowed_users, allowed_groups, questions,
+                        rows, cols, created_by) -> int:
+    """A query-backed expert (azure/sqlserver): no stored file, fetches live on load."""
+    with get_cursor() as cur:
+        cur.execute(
+            """INSERT INTO DataExperts
+               (Label, Description, FilePath, OriginalFileName, SheetName, AccessMode,
+                AllowedUsers, AllowedGroups, RecommendedQuestions, Rows, Cols,
+                IsActive, CreatedBy, CreatedAt, UpdatedBy, UpdatedAt,
+                SourceType, SourceConfig, SqlQuery)
+               VALUES (?, ?, '', '', NULL, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)""",
+            (label, description, access_mode, allowed_users, allowed_groups,
+             clean_questions(questions), rows, cols,
+             created_by, now_utc(), created_by, now_utc(),
+             source_type_, source_config_json, sql_query),
+        )
+        return cur.lastrowid
+
+
+def update_expert_source(expert_id: int, source_config_json: str, sql_query: str,
+                         rows, cols, updated_by: str):
+    with get_cursor() as cur:
+        cur.execute(
+            "UPDATE DataExperts SET SourceConfig=?, SqlQuery=?, Rows=?, Cols=?, "
+            "UpdatedBy=?, UpdatedAt=? WHERE ExpertID=?",
+            (source_config_json, sql_query, rows, cols, updated_by, now_utc(), expert_id),
+        )
 
 
 def set_expert_file(expert_id: int, file_path: str, original_name: str,
@@ -161,7 +205,7 @@ def all_experts() -> List[Dict[str, Any]]:
 
 
 def experts_for_user(username: str, groups: List[str]) -> List[Dict[str, Any]]:
-    return [e for e in all_experts() if e["IsActive"] and e["FilePath"]
+    return [e for e in all_experts() if e["IsActive"] and is_loadable(e)
             and user_allowed(e, username, groups)]
 
 

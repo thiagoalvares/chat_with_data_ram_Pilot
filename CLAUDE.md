@@ -118,6 +118,23 @@ access enforced server-side (users list OR AD groups via X-User-Groups, which
 manages everything in the admin console (create/edit/replace file/disable, up
 to 6 recommended questions that become the user's chips).
 
+## Rollout batch 3 (Aug 2026): live data sources — Azure + SQL Server
+
+Data Experts can be **query-backed**: source = Azure blobs (parquet/csv/xlsx;
+downloaded with the app's Entra service principal — AZURE_TENANT_ID/CLIENT_ID/
+CLIENT_SECRET in .env — then the admin's SQL runs locally in DuckDB, blobs as
+tables named by their aliases) or SQL Server/Azure SQL (the DATABASE runs the
+SQL; Windows auth = the service's own identity (ITS service account/gMSA, no
+stored password) or SQL login (Fernet-encrypted)). Fetched **live on every
+load**, then fed as CSV bytes through the SAME _handle_upload shim — pipeline
+untouched. All in `services/data_sources.py` (lazy imports: service runs
+without duckdb/azure/pyodbc installed). Admin form has a source picker + Test
+query; create/save execute the definition once before persisting. Guards:
+DATASOURCE_MAX_ROWS (500k) + the 50 MB working cap. Header shows an
+"⚡ Azure integrated" badge when a live expert is visible to the user. See
+ROLLOUT_FEATURES.md batch 3 (incl. ITS asks + new egress destinations). NOT
+yet tested against a real Azure account or SQL Server — needs credentials.
+
 ## How a request flows
 1. Browser calls .NET (`/upload/standard`, `/ask`, `/export/...`).
 2. .NET resolves the session cookie, forwards to Python with `X-Session-Id`.

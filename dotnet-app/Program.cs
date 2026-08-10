@@ -280,6 +280,9 @@ dataEndpoints.Add(app.MapPost("/api/admin/experts/create",   (HttpContext ctx, I
 dataEndpoints.Add(app.MapPost("/api/admin/experts/update",   (HttpContext ctx, IHttpClientFactory f) => ProxyJson  (ctx, f, "/api/admin/experts/update")));
 dataEndpoints.Add(app.MapPost("/api/admin/experts/replace_file", (HttpContext ctx, IHttpClientFactory f) => ProxyUpload(ctx, f, "/api/admin/experts/replace_file")));
 dataEndpoints.Add(app.MapPost("/api/admin/experts/toggle",   (HttpContext ctx, IHttpClientFactory f) => ProxyJson  (ctx, f, "/api/admin/experts/toggle")));
+// ── Query-backed experts: Azure + SQL Server (rollout batch 3) ──
+dataEndpoints.Add(app.MapPost("/api/admin/experts/create_query", (HttpContext ctx, IHttpClientFactory f) => ProxyJson(ctx, f, "/api/admin/experts/create_query")));
+dataEndpoints.Add(app.MapPost("/api/admin/experts/test_query",   (HttpContext ctx, IHttpClientFactory f) => ProxyJson(ctx, f, "/api/admin/experts/test_query")));
 
 dataEndpoints.Add(app.MapGet ("/api/admin/models/history", (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/admin/models/history")));
 
