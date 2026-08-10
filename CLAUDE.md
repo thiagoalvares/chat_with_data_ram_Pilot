@@ -86,6 +86,27 @@ memory backend, `serve.py` waitress entry) all carry over unchanged.
 `storage.py` still contains the `disk`/`sqlserver` backends but they are **not
 used** here (memory only).
 
+## Rollout batch (Aug 2026): per-user keys, usage tracking, admin
+
+See ROLLOUT_FEATURES.md for the full write-up. Essentials:
+- Every user stores their OWN LiteLLM key (blocking onboarding modal; Fernet-
+  encrypted in python-service/chatdata.db — gitignored, never commit).
+- Every gateway call is usage-logged (exact tokens, cost, model, call type) to
+  SQLite. My-usage (users) and admin dashboards + global model selection in UI.
+- Mechanism preserves the golden rule: config.py serves the per-request key and
+  admin-selected model dynamically (services/request_context.py) to the
+  UNTOUCHED llm.py; services/usage_capture.py reads token counts off gateway
+  responses via a proxy around the network call — llm.py byte-identical.
+- Identity = X-User from .NET: Windows Auth name when on; else Auth:DevUsername
+  or the machine username. No separate login system — do not add one.
+- Required env: ENCRYPTION_KEY (Fernet). ADMIN_USERS = comma list.
+  INTERNAL_API_SECRET (+ PythonService:InternalSecret in .NET) = optional shared
+  secret; ENABLE IT while Python runs on a different machine than .NET (X-User
+  is otherwise spoofable on the network). Admin/env changes need a restart.
+- New deps: cryptography. Pricing table: services/pricing.py (keep in sync with
+  gateway billing). services/pricing.py is in services/ on purpose — a config/
+  package would shadow config.py.
+
 ## How a request flows
 1. Browser calls .NET (`/upload/standard`, `/ask`, `/export/...`).
 2. .NET resolves the session cookie, forwards to Python with `X-Session-Id`.

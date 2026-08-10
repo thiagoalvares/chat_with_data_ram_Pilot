@@ -295,6 +295,29 @@
     .hist-item:hover { background: var(--navy-light); color: var(--navy); }
     .hist-none { font-size: 0.66rem; color: var(--silver); padding: 0.4rem 0.55rem; }
 
+    /* ── Rollout batch: onboarding / settings / usage / admin modals ───────── */
+    .modal-lg { min-width: 520px; max-width: 760px; width: 92%; max-height: 90vh; overflow-y: auto; }
+    .steps-box { background: var(--bg2); border-left: 3px solid var(--navy); border-radius: 0 6px 6px 0; padding: 0.8rem 1rem; margin: 0.8rem 0; font-size: 0.78rem; }
+    .steps-box ol { margin: 0.4rem 0 0 1.1rem; line-height: 1.9; color: var(--text2); }
+    .steps-box a { color: var(--navy-mid); font-weight: 600; }
+    .key-input { width: 100%; padding: 0.6rem 0.8rem; border: 1.5px solid var(--border2); border-radius: 6px; font-family: var(--mono); font-size: 0.78rem; background: var(--bg); color: var(--text); }
+    .key-input:focus { outline: none; border-color: var(--navy); }
+    .key-error { color: var(--error); font-size: 0.72rem; margin-top: 0.5rem; display: none; }
+    .btn-primary-sm { font-family: var(--inter); font-size: 0.74rem; font-weight: 600; color: #fff; background: var(--navy); border: none; border-radius: 6px; padding: 0.55rem 1.2rem; cursor: pointer; }
+    .btn-primary-sm:disabled { opacity: 0.6; cursor: default; }
+    .btn-plain-sm { font-family: var(--inter); font-size: 0.74rem; font-weight: 500; color: var(--text2); background: var(--bg3); border: none; border-radius: 6px; padding: 0.55rem 1.1rem; cursor: pointer; }
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.6rem; margin: 0.9rem 0; }
+    .stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 0.7rem 0.5rem; text-align: center; }
+    .stat-card .val { font-family: var(--mono); font-size: 1.25rem; font-weight: 700; color: var(--navy-mid); }
+    .stat-card .lbl { font-size: 0.6rem; color: var(--silver); text-transform: uppercase; letter-spacing: 0.07em; margin-top: 0.2rem; }
+    .mini-table { width: 100%; border-collapse: collapse; font-size: 0.72rem; margin-top: 0.5rem; }
+    .mini-table th { text-align: left; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--silver); border-bottom: 2px solid var(--border2); padding: 0.35rem 0.5rem; }
+    .mini-table td { padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); color: var(--text2); }
+    .mini-table td.num { text-align: right; font-family: var(--mono); }
+    .model-opt { display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0.8rem; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 0.4rem; cursor: pointer; font-size: 0.78rem; color: var(--text); background: var(--bg2); }
+    .model-opt:hover { border-color: var(--navy); background: var(--navy-light); }
+    .model-badge { background: var(--navy-light); color: var(--navy-mid); border: 1px solid var(--border); border-radius: 4px; padding: 0.2rem 0.6rem; font-size: 0.66rem; font-family: var(--mono); }
+
     /* ── Dark mode ─────────────────────────────────────────────────────────── */
     html[data-theme="dark"] {
       --bg:        #121A26;
@@ -430,6 +453,9 @@
           <button class="view-tab" id="view-tab-dash" onclick="showView('dashboard')">Dashboard</button>
         </div>
         <button class="btn-header" onclick="exportConversation()" title="Export this conversation to a Word document">↓ Export Report</button>
+        <button class="icon-btn" onclick="showUsageDashboard()" title="My usage">📊</button>
+        <button class="icon-btn" onclick="showSettingsModal()" title="Settings (API key)">⚙</button>
+        <button class="icon-btn" id="admin-btn" onclick="showAdminDashboard()" title="Admin dashboard" style="display:none">🛡</button>
         <button class="icon-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle dark mode">◐</button>
         <button class="btn-ghost" onclick="clearChat()">Clear Chat</button>
       </div>
@@ -828,6 +854,7 @@ async function sendQuestion() {
     });
     const d = await r.json();
     thinking.remove();
+    if (d.needs_key) showOnboardingModal();   // stored key missing/invalid
     transcripts[mode].push({
       id: ++msgCounter, role: 'assistant',
       content: d.error ? '⚠ ' + d.error : d.answer,
@@ -1785,6 +1812,270 @@ function renderImsResults(summary, results) {
 function exportImsReport() {
   window.location.href = '/healthcheck/export';
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Rollout batch: per-user API keys, usage dashboards, admin, model selection
+// All additive — nothing above this block changed except a needs_key hook.
+// ═════════════════════════════════════════════════════════════════════════════
+
+function makeOverlay(id, html) {
+  const overlay = document.createElement('div');
+  overlay.id = id;
+  overlay.className = 'modal-overlay open';
+  overlay.innerHTML = `<div class="modal modal-lg">${html}</div>`;
+  document.body.appendChild(overlay);
+  return overlay;
+}
+function closeOverlay(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+// ── Onboarding (blocking until a key is saved) ────────────────────────────────
+async function checkUserApiKey() {
+  try {
+    const r = await fetch('/api/user/check_key');
+    const d = await r.json();
+    if (d && d.has_key === false) showOnboardingModal();
+  } catch (e) { console.error('check_key failed:', e); }
+}
+
+function showOnboardingModal() {
+  if (document.getElementById('onboarding-overlay')) return;
+  makeOverlay('onboarding-overlay', `
+    <div class="modal-title">Welcome to Chat with Data</div>
+    <div class="modal-sub">To use the app, add your personal LiteLLM API key. All usage is tracked to your own account.</div>
+    <div class="steps-box">
+      <strong>How to get your API key</strong>
+      <ol>
+        <li>Open the <a href="https://funcapp-genie-prod.azurewebsites.us/api/aigateway-request" target="_blank">API key request portal</a></li>
+        <li>Fill in your GA email and select your department</li>
+        <li>Submit, then open the confirmation email and click "View Secret in Azure Portal"</li>
+        <li>In Azure Key Vault, open the secret under "Current Version"</li>
+        <li>Click "Show Secret Value" and copy the key (starts with sk-)</li>
+      </ol>
+    </div>
+    <label style="display:block;font-size:0.72rem;font-weight:600;color:var(--text);margin-bottom:0.4rem">Paste your API key</label>
+    <input type="password" class="key-input" id="onboard-key-input" placeholder="sk-..." autocomplete="off"/>
+    <div class="key-error" id="onboard-key-error"></div>
+    <div style="text-align:right;margin-top:1.2rem">
+      <button class="btn-primary-sm" id="onboard-save-btn" onclick="saveApiKey('onboard')">Save &amp; continue</button>
+    </div>`);
+  setTimeout(() => document.getElementById('onboard-key-input')?.focus(), 80);
+}
+
+async function saveApiKey(prefix) {
+  const input = document.getElementById(`${prefix}-key-input`);
+  const errEl = document.getElementById(`${prefix}-key-error`);
+  const btn   = document.getElementById(`${prefix}-save-btn`);
+  const key   = (input.value || '').trim();
+  errEl.style.display = 'none';
+  if (!key)                    { errEl.textContent = 'Please enter your API key.'; errEl.style.display = 'block'; return; }
+  if (!key.startsWith('sk-'))  { errEl.textContent = 'The key should start with "sk-".'; errEl.style.display = 'block'; return; }
+  const orig = btn.textContent;
+  btn.textContent = 'Validating…'; btn.disabled = true;
+  try {
+    const r = await fetch('/api/user/save_key', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: key })
+    });
+    const d = await r.json();
+    if (r.ok && d.success) {
+      closeOverlay('onboarding-overlay');
+      closeOverlay('settings-overlay');
+      location.reload();
+    } else {
+      errEl.textContent = d.error || 'Could not save the key.'; errEl.style.display = 'block';
+      btn.textContent = orig; btn.disabled = false;
+    }
+  } catch (e) {
+    errEl.textContent = 'Network error: ' + e.message; errEl.style.display = 'block';
+    btn.textContent = orig; btn.disabled = false;
+  }
+}
+
+// ── Settings (view masked key, update) ────────────────────────────────────────
+async function showSettingsModal() {
+  let info = null;
+  try { const r = await fetch('/api/user/get_key'); if (r.ok) info = await r.json(); } catch (e) {}
+  makeOverlay('settings-overlay', `
+    <div class="modal-title">Settings</div>
+    <div class="modal-sub">Your personal LiteLLM API key (stored encrypted on the server).</div>
+    ${info ? `
+      <div style="font-size:0.78rem;color:var(--text2)">Current key:
+        <span class="model-badge">${esc(info.masked_key)}</span></div>
+      <div style="font-size:0.66rem;color:var(--silver);margin-top:0.3rem">Last updated: ${esc(info.updated_at || '—')}</div>
+    ` : `<div style="font-size:0.78rem;color:var(--warn)">No API key on file yet.</div>`}
+    <div style="margin-top:1rem">
+      <label style="display:block;font-size:0.72rem;font-weight:600;color:var(--text);margin-bottom:0.4rem">${info ? 'Replace with a new key' : 'Add your key'}</label>
+      <input type="password" class="key-input" id="settings-key-input" placeholder="sk-..." autocomplete="off"/>
+      <div class="key-error" id="settings-key-error"></div>
+    </div>
+    <div style="text-align:right;margin-top:1.2rem">
+      <button class="btn-plain-sm" onclick="closeOverlay('settings-overlay')" style="margin-right:0.5rem">Close</button>
+      <button class="btn-primary-sm" id="settings-save-btn" onclick="saveApiKey('settings')">Save key</button>
+    </div>`);
+}
+
+// ── My usage ──────────────────────────────────────────────────────────────────
+async function showUsageDashboard() {
+  try {
+    const [sRes, cRes, hRes] = await Promise.all([
+      fetch('/api/user/usage/summary?period=month'),
+      fetch('/api/user/usage/chart?period=month'),
+      fetch('/api/user/usage/history?limit=8'),
+    ]);
+    const s = await sRes.json();
+    const c = await cRes.json();
+    const h = await hRes.json();
+
+    const histRows = (h.history || []).map(x => `
+      <tr>
+        <td>${esc((x.timestamp || '').slice(0, 16))}</td>
+        <td>${esc(x.mode)}</td>
+        <td>${esc((x.question || '').slice(0, 60))}</td>
+        <td class="num">${(x.tokens || 0).toLocaleString()}</td>
+        <td class="num">$${(x.cost || 0).toFixed(4)}</td>
+      </tr>`).join('');
+
+    makeOverlay('usage-overlay', `
+      <div class="modal-title">My usage — last 30 days</div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="val">${s.total_questions ?? 0}</div><div class="lbl">Questions</div></div>
+        <div class="stat-card"><div class="val">${(s.total_tokens ?? 0).toLocaleString()}</div><div class="lbl">Tokens</div></div>
+        <div class="stat-card"><div class="val">$${(s.total_cost ?? 0).toFixed(2)}</div><div class="lbl">Total cost</div></div>
+        <div class="stat-card"><div class="val">$${(s.avg_cost_per_question ?? 0).toFixed(3)}</div><div class="lbl">Avg / question</div></div>
+      </div>
+      <div class="chart-canvas-wrap" style="height:170px"><canvas id="usage-cv"></canvas></div>
+      ${histRows ? `
+        <table class="mini-table" style="margin-top:0.9rem">
+          <thead><tr><th>When (UTC)</th><th>Mode</th><th>Question</th><th style="text-align:right">Tokens</th><th style="text-align:right">Cost</th></tr></thead>
+          <tbody>${histRows}</tbody>
+        </table>` : `<div style="font-size:0.74rem;color:var(--silver);margin-top:0.8rem">No usage recorded yet — ask your first question.</div>`}
+      <div style="text-align:right;margin-top:1.1rem">
+        <button class="btn-plain-sm" onclick="closeUsageOverlay()">Close</button>
+      </div>`);
+
+    const days = (c.data || []);
+    if (days.length) {
+      renderChart('usage-cv', {
+        type: 'bar', title: 'Tokens per day',
+        labels: days.map(x => x.date.slice(5)),
+        datasets: [{ label: 'Tokens', data: days.map(x => x.tokens) }],
+      });
+    }
+  } catch (e) { alert('Could not load usage: ' + e.message); }
+}
+function closeUsageOverlay() {
+  if (chartInstances['usage-cv']) { try { chartInstances['usage-cv'].destroy(); } catch (e) {} delete chartInstances['usage-cv']; }
+  closeOverlay('usage-overlay');
+}
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+async function checkAdminStatus() {
+  try {
+    const r = await fetch('/api/admin/check');
+    const d = await r.json();
+    if (d.is_admin) document.getElementById('admin-btn').style.display = '';
+  } catch (e) {}
+}
+
+async function showAdminDashboard() {
+  try {
+    const [sRes, uRes, mRes] = await Promise.all([
+      fetch('/api/admin/usage/summary?period=month'),
+      fetch('/api/admin/usage/by_user?period=month&limit=10'),
+      fetch('/api/admin/models/current'),
+    ]);
+    const s = await sRes.json();
+    const u = await uRes.json();
+    const m = await mRes.json();
+    if (s.error) { alert(s.error); return; }
+
+    const rows = (u.data || []).map(x => `
+      <tr>
+        <td>${esc(x.username)}</td>
+        <td class="num">${x.questions}</td>
+        <td class="num">${(x.tokens || 0).toLocaleString()}</td>
+        <td class="num">$${(x.cost || 0).toFixed(2)}</td>
+      </tr>`).join('');
+
+    makeOverlay('admin-overlay', `
+      <div class="modal-title">Admin dashboard</div>
+      <div style="background:var(--navy-light);border:1px solid var(--border);border-radius:6px;padding:0.7rem 0.9rem;font-size:0.78rem;color:var(--text);display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap">
+        <span>Active model:</span> <span class="model-badge">${esc(m.model_name)}</span>
+        <span style="color:var(--silver);font-size:0.68rem">$${m.input_price}/M in · $${m.output_price}/M out · set by ${esc(m.set_by || 'system')}</span>
+        <button class="btn-primary-sm" style="margin-left:auto;padding:0.35rem 0.8rem" onclick="showModelSelector()">Change model</button>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="val">${s.total_users}</div><div class="lbl">Users</div></div>
+        <div class="stat-card"><div class="val">${s.active_users}</div><div class="lbl">Active (30d)</div></div>
+        <div class="stat-card"><div class="val">${s.total_questions}</div><div class="lbl">Questions</div></div>
+        <div class="stat-card"><div class="val">${(s.total_tokens || 0).toLocaleString()}</div><div class="lbl">Tokens</div></div>
+        <div class="stat-card"><div class="val">$${(s.total_cost || 0).toFixed(2)}</div><div class="lbl">Cost</div></div>
+      </div>
+      ${rows ? `
+        <div style="font-size:0.68rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--silver);margin-top:0.6rem">Top users by cost — last 30 days</div>
+        <table class="mini-table">
+          <thead><tr><th>User</th><th style="text-align:right">Questions</th><th style="text-align:right">Tokens</th><th style="text-align:right">Cost</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>` : `<div style="font-size:0.74rem;color:var(--silver)">No usage recorded yet.</div>`}
+      <div style="text-align:right;margin-top:1.1rem">
+        <button class="btn-plain-sm" onclick="closeOverlay('admin-overlay')">Close</button>
+      </div>`);
+  } catch (e) { alert('Could not load admin dashboard: ' + e.message); }
+}
+
+async function showModelSelector() {
+  try {
+    const r = await fetch('/api/admin/models/available');
+    const d = await r.json();
+    if (d.error) { alert(d.error); return; }
+    const models = d.models || [];
+    const list = models.length
+      ? models.map(mm => `
+          <label class="model-opt">
+            <input type="radio" name="model-select" value="${esc(mm.id)}"/>
+            <span style="font-family:var(--mono);font-weight:600">${esc(mm.id)}</span>
+            <span style="color:var(--silver);font-size:0.66rem;margin-left:auto">${esc(mm.owned_by || '')}</span>
+          </label>`).join('')
+      : `<div style="font-size:0.74rem;color:var(--warn)">Could not fetch the model list from the gateway.</div>`;
+    makeOverlay('model-selector-overlay', `
+      <div class="modal-title">Select the model for all users</div>
+      <div class="modal-sub">The chosen model applies to every question app-wide, immediately.</div>
+      <div style="max-height:45vh;overflow-y:auto">${list}</div>
+      <label style="display:block;font-size:0.72rem;font-weight:600;color:var(--text);margin:0.8rem 0 0.4rem">Reason (optional)</label>
+      <input type="text" class="key-input" id="model-change-reason" style="font-family:var(--inter)" placeholder="e.g. cost testing"/>
+      <div style="text-align:right;margin-top:1.1rem">
+        <button class="btn-plain-sm" onclick="closeOverlay('model-selector-overlay')" style="margin-right:0.5rem">Cancel</button>
+        <button class="btn-primary-sm" onclick="selectModel()">Change model</button>
+      </div>`);
+  } catch (e) { alert('Could not load models: ' + e.message); }
+}
+
+async function selectModel() {
+  const chosen = document.querySelector('input[name="model-select"]:checked');
+  if (!chosen) { alert('Select a model first.'); return; }
+  const reason = (document.getElementById('model-change-reason').value || '').trim();
+  try {
+    const r = await fetch('/api/admin/models/select', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model_name: chosen.value, reason })
+    });
+    const d = await r.json();
+    if (r.ok && d.success) {
+      closeOverlay('model-selector-overlay');
+      closeOverlay('admin-overlay');
+      showAdminDashboard();
+    } else { alert(d.error || 'Failed to change model'); }
+  } catch (e) { alert('Network error: ' + e.message); }
+}
+
+// Run the rollout-batch checks on load (separate listener; existing init untouched)
+document.addEventListener('DOMContentLoaded', () => {
+  checkUserApiKey();
+  checkAdminStatus();
+});
 </script>
 </body>
 </html>

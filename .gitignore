@@ -38,3 +38,9 @@ Thumbs.db
 
 # Local persisted session state (disk storage backend)
 local_state/
+
+# Per-user keys + usage database (never commit)
+chatdata.db
+*.db
+*.db-wal
+*.db-shm

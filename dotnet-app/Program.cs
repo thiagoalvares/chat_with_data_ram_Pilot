@@ -43,9 +43,30 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
 });
 builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = MaxUploadBytes);
 
+// Optional shared secret sent to the Python service on every proxied request
+// (PythonService:InternalSecret). Pair with INTERNAL_API_SECRET in the Python
+// .env so nothing on the network can talk to Python while it lives on a
+// separate machine. Empty = disabled.
+var internalSecret = builder.Configuration["PythonService:InternalSecret"] ?? "";
+
+// Dev identity: when Windows Authentication is off (local testing), requests
+// still need a stable username for per-user keys/usage. Auth:DevUsername
+// overrides it (useful to simulate another user or a non-admin); otherwise the
+// machine's logged-in username is used. With Windows Auth ON, the real
+// authenticated name always wins.
+var devUsername = builder.Configuration["Auth:DevUsername"] ?? "";
+
 var app = builder.Build();
 
 const string SidCookie = "cwd_sid";
+
+string GetUsername(HttpContext ctx)
+{
+    var user = ctx.User?.Identity?.Name;
+    if (!string.IsNullOrEmpty(user)) return user;                 // Windows Auth
+    if (!string.IsNullOrEmpty(devUsername)) return devUsername;   // dev override
+    return Environment.UserName;                                  // machine user
+}
 
 // Resolve (or create) the per-user session id and ensure the cookie is set.
 string GetOrCreateSessionId(HttpContext ctx)
@@ -68,11 +89,11 @@ HttpRequestMessage NewRequest(HttpContext ctx, HttpMethod method, string path, s
 {
     var req = new HttpRequestMessage(method, path);
     req.Headers.Add("X-Session-Id", sid);
-    // Forward the authenticated user (when auth is enabled) so the Python
-    // service can log/scope by user. Empty in local passthrough mode.
-    var user = ctx.User?.Identity?.Name;
-    if (!string.IsNullOrEmpty(user))
-        req.Headers.Add("X-User", user);
+    // Always identify the user (Windows Auth name, or the dev fallback) —
+    // per-user API keys and usage tracking key off this header.
+    req.Headers.Add("X-User", GetUsername(ctx));
+    if (!string.IsNullOrEmpty(internalSecret))
+        req.Headers.Add("X-Internal-Auth", internalSecret);
     return req;
 }
 
@@ -143,6 +164,7 @@ dataEndpoints.Add(app.MapPost("/upload/variance/{slot}", (HttpContext ctx, IHttp
 // ── Proxy: JSON POSTs (ask / clear) ─────────────────────────────────────────────
 async Task ProxyJson(HttpContext ctx, IHttpClientFactory factory, string targetPath)
 {
+    targetPath += ctx.Request.QueryString.Value;   // forward ?period=... etc.
     var sid = GetOrCreateSessionId(ctx);
     var client = factory.CreateClient("python");
 
@@ -163,6 +185,7 @@ dataEndpoints.Add(app.MapPost("/export/conversation", (HttpContext ctx, IHttpCli
 // ── Proxy: file downloads (GET) ──────────────────────────────────────────────────
 async Task ProxyGet(HttpContext ctx, IHttpClientFactory factory, string targetPath)
 {
+    targetPath += ctx.Request.QueryString.Value;   // forward ?period=... etc.
     var sid = GetOrCreateSessionId(ctx);
     var client = factory.CreateClient("python");
 
@@ -173,6 +196,23 @@ async Task ProxyGet(HttpContext ctx, IHttpClientFactory factory, string targetPa
 
 dataEndpoints.Add(app.MapGet("/export/last_result",  (HttpContext ctx, IHttpClientFactory f) => ProxyGet(ctx, f, "/api/export/last_result")));
 dataEndpoints.Add(app.MapGet("/export/debug_result", (HttpContext ctx, IHttpClientFactory f) => ProxyGet(ctx, f, "/api/export/debug_result")));
+
+// ── Rollout batch: per-user API keys, usage dashboards, admin, model select ──
+dataEndpoints.Add(app.MapGet ("/api/user/check_key",       (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/user/check_key")));
+dataEndpoints.Add(app.MapPost("/api/user/save_key",        (HttpContext ctx, IHttpClientFactory f) => ProxyJson(ctx, f, "/api/user/save_key")));
+dataEndpoints.Add(app.MapGet ("/api/user/get_key",         (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/user/get_key")));
+dataEndpoints.Add(app.MapGet ("/api/user/usage/summary",   (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/user/usage/summary")));
+dataEndpoints.Add(app.MapGet ("/api/user/usage/chart",     (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/user/usage/chart")));
+dataEndpoints.Add(app.MapGet ("/api/user/usage/history",   (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/user/usage/history")));
+dataEndpoints.Add(app.MapGet ("/api/admin/check",          (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/admin/check")));
+dataEndpoints.Add(app.MapGet ("/api/admin/users/list",     (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/admin/users/list")));
+dataEndpoints.Add(app.MapGet ("/api/admin/usage/summary",  (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/admin/usage/summary")));
+dataEndpoints.Add(app.MapGet ("/api/admin/usage/by_user",  (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/admin/usage/by_user")));
+dataEndpoints.Add(app.MapGet ("/api/admin/usage/by_model", (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/admin/usage/by_model")));
+dataEndpoints.Add(app.MapGet ("/api/admin/models/available",(HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/admin/models/available")));
+dataEndpoints.Add(app.MapGet ("/api/admin/models/current", (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/admin/models/current")));
+dataEndpoints.Add(app.MapPost("/api/admin/models/select",  (HttpContext ctx, IHttpClientFactory f) => ProxyJson(ctx, f, "/api/admin/models/select")));
+dataEndpoints.Add(app.MapGet ("/api/admin/models/history", (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/admin/models/history")));
 
 // When auth is enabled (QA/PROD), require an authenticated user on every data
 // endpoint. In local/dev (Auth:Enabled=false) these stay open for easy testing.

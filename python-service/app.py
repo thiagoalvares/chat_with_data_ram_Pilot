@@ -20,9 +20,12 @@ providing durable, stateless session/data storage (see README / architecture doc
 """
 
 import io
+import uuid
+from datetime import datetime, timedelta
 from typing import Any
 
 import pandas as pd
+import requests as _requests
 from flask import Blueprint, Flask, jsonify, request, send_file
 
 from config import Config
@@ -31,9 +34,16 @@ from models.schemas import DebugEntry
 from prompts import standard, variance
 from services import llm as llm_service
 from services import insights
+from services import request_context, usage_capture
+from services import database as db
+from services.admin_auth import is_admin, require_admin
+from services.crypto import CryptoNotConfigured, decrypt_api_key, encrypt_api_key, mask_api_key
 from services.data_manager import get_session, save_session, get_schema_info
 from services.executor import execute_generated_code
 from services.file_handler import FileHandlerError, get_excel_sheets, read_file
+from services.model_manager import (
+    change_model, get_available_models, get_current_model_config, get_model_history,
+)
 from services.report_export import build_conversation_docx
 
 api = Blueprint("api", __name__, url_prefix="/api")
@@ -57,6 +67,52 @@ def _sid() -> str:
     if not sid:
         raise MissingSessionId()
     return sid
+
+
+def _username() -> str:
+    """
+    Identity supplied by the .NET layer in X-User: the Windows username when
+    Windows Authentication is on, otherwise the .NET host's dev fallback.
+    """
+    return (request.headers.get("X-User") or "unknown").strip()
+
+
+@api.before_request
+def _check_internal_secret():
+    """
+    Optional shared secret between .NET and Python (INTERNAL_API_SECRET in
+    .env). Off by default. When set, every /api request must carry the matching
+    X-Internal-Auth header — closes the 'anyone on the network can hit port
+    8000 and claim any X-User' gap while Python runs on a separate machine.
+    """
+    secret = Config.INTERNAL_API_SECRET
+    if secret and request.headers.get("X-Internal-Auth") != secret:
+        return jsonify({"error": "Unauthorized"}), 401
+
+
+def _resolve_user_context(username: str):
+    """
+    Look up the user, decrypt their API key, and read the active model.
+    Returns ((user, api_key, model_name), None) on success or (None, flask_response).
+    """
+    user = db.get_user_by_username(username)
+    if not user or not user.get("IsActive", 1):
+        return None, (jsonify({
+            "error": "No API key on file. Please set up your LiteLLM API key to use the app.",
+            "needs_key": True,
+        }), 401)
+    try:
+        api_key = decrypt_api_key(user["APIKey"])
+    except CryptoNotConfigured as e:
+        return None, (jsonify({"error": str(e)}), 503)
+    except Exception:
+        logger.error(f"Could not decrypt stored key for {username}")
+        return None, (jsonify({
+            "error": "Your stored API key could not be read. Please re-enter it.",
+            "needs_key": True,
+        }), 401)
+    model_name = get_current_model_config()["model_name"]
+    return (user, api_key, model_name), None
 
 
 # ── Shared pipeline helpers (reproduced verbatim from prototype chat.py) ───────
@@ -242,6 +298,26 @@ def ask():
     if not question:
         return jsonify({"error": "Empty question"}), 400
 
+    # ── Per-user key + model + usage tracking (additive envelope) ─────────────
+    # The pipeline below is UNCHANGED; this wrapper only sets the per-request
+    # context that config.py serves to the untouched llm.py, and flushes the
+    # captured token usage to the database afterwards.
+    username = _username()
+    ctx, err = _resolve_user_context(username)
+    if err:
+        return err
+    user, user_key, model_name = ctx
+    request_id = uuid.uuid4().hex
+    ctx_tokens = request_context.begin(user_key, model_name)
+    try:
+        return _ask_pipeline(sid, sess, question, mode)
+    finally:
+        usage_capture.flush(user["UserID"], username, sid, request_id, mode, question)
+        request_context.end(ctx_tokens)
+
+
+def _ask_pipeline(sid, sess, question, mode):
+    """The original /ask body, moved verbatim (logic identical to the prototype flow)."""
     debug = []
     logger.info(f"Question received | mode={mode} | sid={sid} | q={question[:80]}")
     history = sess.get_history(mode)
@@ -318,26 +394,38 @@ def ask_refine():
     if not question or result_str is None:
         return jsonify({"error": "Nothing to refine yet. Ask a question first."}), 400
 
-    if style == "detail":
-        styled_q = (f"{question}\n\n(Re-explain the result above in MORE detail: "
-                    f"cover the notable values, comparisons, and any caveats.)")
-    else:
-        styled_q = (f"{question}\n\n(Re-explain the result above in ONE short "
-                    f"sentence — the single most important takeaway.)")
+    # Per-user key + model + usage tracking (same additive envelope as /ask)
+    username = _username()
+    ctx, err = _resolve_user_context(username)
+    if err:
+        return err
+    user, user_key, model_name = ctx
+    request_id = uuid.uuid4().hex
+    ctx_tokens = request_context.begin(user_key, model_name)
+    try:
+        if style == "detail":
+            styled_q = (f"{question}\n\n(Re-explain the result above in MORE detail: "
+                        f"cover the notable values, comparisons, and any caveats.)")
+        else:
+            styled_q = (f"{question}\n\n(Re-explain the result above in ONE short "
+                        f"sentence — the single most important takeaway.)")
 
-    history = sess.get_history(mode)
-    if mode == "variance":
-        messages = variance.build_answer_gen_prompt(styled_q, result_str, sess.label_a, sess.label_b, history, metadata)
-    else:
-        messages = standard.build_answer_gen_prompt(styled_q, result_str, history, metadata)
+        history = sess.get_history(mode)
+        if mode == "variance":
+            messages = variance.build_answer_gen_prompt(styled_q, result_str, sess.label_a, sess.label_b, history, metadata)
+        else:
+            messages = standard.build_answer_gen_prompt(styled_q, result_str, history, metadata)
 
-    ok, raw_answer = llm_service.generate_human_answer(messages)
-    if not ok:
-        return jsonify({"error": raw_answer}), 502
+        ok, raw_answer = llm_service.generate_human_answer(messages)
+        if not ok:
+            return jsonify({"error": raw_answer}), 502
 
-    answer, chart = llm_service.parse_answer_response(raw_answer)
-    logger.info(f"Refine ({style}) | sid={sid} | mode={mode}")
-    return jsonify({"answer": answer, "chart": chart})
+        answer, chart = llm_service.parse_answer_response(raw_answer)
+        logger.info(f"Refine ({style}) | sid={sid} | mode={mode}")
+        return jsonify({"answer": answer, "chart": chart})
+    finally:
+        usage_capture.flush(user["UserID"], username, sid, request_id, mode, question, refine=True)
+        request_context.end(ctx_tokens)
 
 
 @api.route("/clear", methods=["POST"])
@@ -454,12 +542,213 @@ def export_conversation():
         return jsonify({"error": f"Export failed: {str(e)}"}), 500
 
 
+# ── Per-user API keys (rollout batch) ─────────────────────────────────────────
+
+def _validate_key_against_gateway(api_key: str):
+    """Test a key with a cheap authenticated call to the gateway."""
+    url = f"{Config.LITELLM_API_BASE}/v1/models"
+    r = _requests.get(url, headers={"Authorization": f"Bearer {api_key}"}, timeout=8, verify=False)
+    r.raise_for_status()
+
+
+@api.route("/user/check_key", methods=["GET"])
+def user_check_key():
+    username = _username()
+    exists = db.user_exists(username)
+    if exists:
+        db.update_user_last_login(username)
+    return jsonify({"has_key": exists, "username": username})
+
+
+@api.route("/user/save_key", methods=["POST"])
+def user_save_key():
+    username = _username()
+    data = request.get_json() or {}
+    api_key = (data.get("api_key") or "").strip()
+
+    if not api_key:
+        return jsonify({"error": "API key is required"}), 400
+    if not api_key.startswith("sk-"):
+        return jsonify({"error": "Invalid API key format (must start with 'sk-')"}), 400
+
+    try:
+        _validate_key_against_gateway(api_key)
+    except Exception as e:
+        logger.warning(f"API key validation failed for {username}: {e}")
+        return jsonify({"error": "That key was rejected by the AI gateway. Check it and try again."}), 400
+
+    try:
+        encrypted = encrypt_api_key(api_key)
+    except CryptoNotConfigured as e:
+        return jsonify({"error": str(e)}), 503
+
+    if db.user_exists(username):
+        db.update_user_api_key(username, encrypted)
+        logger.info(f"API key updated for {username}")
+    else:
+        db.create_user(username, encrypted)
+        logger.info(f"New user registered: {username}")
+    return jsonify({"success": True})
+
+
+@api.route("/user/get_key", methods=["GET"])
+def user_get_key():
+    username = _username()
+    user = db.get_user_by_username(username)
+    if not user:
+        return jsonify({"error": "No API key on file"}), 404
+    try:
+        masked = mask_api_key(decrypt_api_key(user["APIKey"]))
+    except Exception:
+        masked = "(unreadable — please re-enter)"
+    return jsonify({"masked_key": masked, "created_at": user["CreatedAt"], "updated_at": user["UpdatedAt"]})
+
+
+# ── Usage dashboards (rollout batch) ──────────────────────────────────────────
+
+def _period_range():
+    """Translate ?period=today|week|month into (start, end) DB timestamps."""
+    period = request.args.get("period", "month")
+    now = datetime.utcnow()
+    if period == "today":
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == "week":
+        start = now - timedelta(days=7)
+    else:
+        start = now - timedelta(days=30)
+    return db.fmt_dt(start), db.fmt_dt(now)
+
+
+@api.route("/user/usage/summary", methods=["GET"])
+def user_usage_summary():
+    start, end = _period_range()
+    return jsonify(db.get_user_usage_summary(_username(), start, end))
+
+
+@api.route("/user/usage/chart", methods=["GET"])
+def user_usage_chart():
+    start, end = _period_range()
+    return jsonify({"data": db.get_user_usage_chart(_username(), start, end)})
+
+
+@api.route("/user/usage/history", methods=["GET"])
+def user_usage_history():
+    limit = min(int(request.args.get("limit", 20)), 100)
+    offset = int(request.args.get("offset", 0))
+    return jsonify({"history": db.get_user_usage_history(_username(), limit, offset)})
+
+
+# ── Admin (rollout batch) ─────────────────────────────────────────────────────
+
+def _admin_guard():
+    try:
+        require_admin(_username())
+        return None
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+
+
+@api.route("/admin/check", methods=["GET"])
+def admin_check():
+    return jsonify({"is_admin": is_admin(_username())})
+
+
+@api.route("/admin/users/list", methods=["GET"])
+def admin_users_list():
+    guard = _admin_guard()
+    if guard:
+        return guard
+    users = db.get_all_users()
+    start, end = db.fmt_dt(datetime.utcnow() - timedelta(days=30)), db.fmt_dt(datetime.utcnow())
+    for u in users:
+        u["usage_summary"] = db.get_user_usage_summary(u["Username"], start, end)
+    return jsonify({"users": users})
+
+
+@api.route("/admin/usage/summary", methods=["GET"])
+def admin_usage_summary():
+    guard = _admin_guard()
+    if guard:
+        return guard
+    start, end = _period_range()
+    return jsonify(db.get_all_users_usage_summary(start, end))
+
+
+@api.route("/admin/usage/by_user", methods=["GET"])
+def admin_usage_by_user():
+    guard = _admin_guard()
+    if guard:
+        return guard
+    start, end = _period_range()
+    limit = min(int(request.args.get("limit", 10)), 100)
+    return jsonify({"data": db.get_usage_by_user(start, end, limit)})
+
+
+@api.route("/admin/usage/by_model", methods=["GET"])
+def admin_usage_by_model():
+    guard = _admin_guard()
+    if guard:
+        return guard
+    start, end = _period_range()
+    return jsonify({"data": db.get_usage_by_model(start, end)})
+
+
+@api.route("/admin/models/available", methods=["GET"])
+def admin_models_available():
+    guard = _admin_guard()
+    if guard:
+        return guard
+    username = _username()
+    user = db.get_user_by_username(username)
+    try:
+        api_key = decrypt_api_key(user["APIKey"]) if user else Config._ENV_LITELLM_API_KEY
+    except Exception:
+        api_key = Config._ENV_LITELLM_API_KEY
+    return jsonify({"models": get_available_models(api_key)})
+
+
+@api.route("/admin/models/current", methods=["GET"])
+def admin_models_current():
+    # Any signed-in user may see which model is active.
+    return jsonify(get_current_model_config())
+
+
+@api.route("/admin/models/select", methods=["POST"])
+def admin_models_select():
+    guard = _admin_guard()
+    if guard:
+        return guard
+    data = request.get_json() or {}
+    model_name = (data.get("model_name") or "").strip()
+    reason = (data.get("reason") or "").strip()
+    if not model_name:
+        return jsonify({"error": "model_name is required"}), 400
+    if change_model(model_name, _username(), reason):
+        return jsonify({"success": True, "model_name": model_name})
+    return jsonify({"error": "Failed to change model"}), 500
+
+
+@api.route("/admin/models/history", methods=["GET"])
+def admin_models_history():
+    guard = _admin_guard()
+    if guard:
+        return guard
+    return jsonify({"history": get_model_history(min(int(request.args.get("limit", 20)), 100))})
+
+
 # ── App factory ───────────────────────────────────────────────────────────────
 
 def create_app() -> Flask:
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = Config.MAX_FILE_BYTES
     app.register_blueprint(api)
+
+    # Rollout batch: usage DB + token-capture shim (llm.py itself is untouched).
+    try:
+        db.initialize_database()
+    except Exception as e:
+        logger.error(f"Database initialization failed (key/usage features disabled): {e}")
+    usage_capture.install()
 
     @app.route("/health")
     @app.route("/api/health")

@@ -92,8 +92,27 @@ def chat_completions():
         "object": "chat.completion",
         "model": body.get("model", "mock-model"),
         "choices": [{"index": 0, "message": {"role": "assistant", "content": content}, "finish_reason": "stop"}],
-        "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        "usage": {
+            "prompt_tokens": sum(len(str(m.get("content", ""))) for m in messages) // 4,
+            "completion_tokens": max(1, len(content) // 4),
+            "total_tokens": sum(len(str(m.get("content", ""))) for m in messages) // 4 + max(1, len(content) // 4),
+        },
     })
+
+
+@app.route("/v1/models", methods=["GET"])
+def list_models():
+    """Mock of the gateway's model listing — used by API-key validation and
+    the admin model selector. Accepts any Bearer key starting with sk-."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer sk-"):
+        return jsonify({"error": "invalid key"}), 401
+    return jsonify({"object": "list", "data": [
+        {"id": "claude-sonnet-5",   "object": "model", "owned_by": "anthropic"},
+        {"id": "claude-sonnet-4-5", "object": "model", "owned_by": "anthropic"},
+        {"id": "gpt-4o",            "object": "model", "owned_by": "openai"},
+        {"id": "gpt-5.4",           "object": "model", "owned_by": "openai"},
+    ]})
 
 
 @app.route("/health")
