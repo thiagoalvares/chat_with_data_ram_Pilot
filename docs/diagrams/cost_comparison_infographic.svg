@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="Arial, sans-serif">
+  <rect width="1600" height="900" fill="#FFFFFF"/>
+
+  <!-- Header band -->
+  <rect x="0" y="0" width="1600" height="112" fill="#0A1628"/>
+  <rect x="40" y="24" width="64" height="64" rx="8" fill="#FFFFFF"/>
+  <image href="data:image/png;base64,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" x="46" y="30" width="52" height="52"/>
+  <text x="122" y="55" font-size="21" font-weight="bold" fill="#FFFFFF" letter-spacing="1">GENERAL ATOMICS</text>
+  <text x="122" y="80" font-size="14" fill="#9FB3D0" letter-spacing="2">AERONAUTICAL SYSTEMS</text>
+  <text x="1560" y="48" text-anchor="end" font-size="30" font-weight="bold" fill="#FFFFFF">Chat with Data vs. ChatGPT</text>
+  <text x="1560" y="78" text-anchor="end" font-size="16" fill="#9FB3D0">Token &amp; cost efficiency · same question, same 12,000-row file · August 2026</text>
+
+  <!-- Card 1: tokens per question -->
+  <rect x="40" y="140" width="480" height="330" rx="12" fill="#FFFFFF" stroke="#C8CED8" stroke-width="1.5"/>
+  <text x="64" y="180" font-size="15" font-weight="bold" fill="#5F5E5A" letter-spacing="1.5">TOKENS PER QUESTION</text>
+  <text x="64" y="238" font-size="17" fill="#0A1628">Chat with Data</text>
+  <rect x="64" y="252" width="82" height="30" rx="4" fill="#1B3A6B"/>
+  <text x="156" y="274" font-size="16" font-weight="bold" fill="#0A1628">~5,000</text>
+  <text x="64" y="330" font-size="17" fill="#5F5E5A">ChatGPT app</text>
+  <rect x="64" y="344" width="410" height="30" rx="4" fill="#8A9BB0"/>
+  <rect x="392" y="344" width="82" height="30" rx="4" fill="#C8CED8"/>
+  <text x="300" y="365" font-size="16" font-weight="bold" fill="#FFFFFF">25,000 – 40,000</text>
+  <rect x="64" y="404" width="432" height="44" rx="6" fill="#0A1628"/>
+  <text x="280" y="433" text-anchor="middle" font-size="21" font-weight="bold" fill="#FFFFFF">5–8× fewer tokens</text>
+
+  <!-- Card 2: cost per question -->
+  <rect x="552" y="140" width="480" height="330" rx="12" fill="#FFFFFF" stroke="#C8CED8" stroke-width="1.5"/>
+  <text x="576" y="180" font-size="15" font-weight="bold" fill="#5F5E5A" letter-spacing="1.5">COST PER QUESTION — 12K-ROW FILE</text>
+  <text x="700" y="280" text-anchor="middle" font-size="46" font-weight="bold" fill="#1B3A6B">$0.046</text>
+  <text x="700" y="310" text-anchor="middle" font-size="15" fill="#5F5E5A">Chat with Data</text>
+  <text x="700" y="330" text-anchor="middle" font-size="13" fill="#8A9BB0">(measured, Claude Sonnet)</text>
+  <line x1="800" y1="220" x2="800" y2="340" stroke="#E5E8EC" stroke-width="2"/>
+  <text x="915" y="280" text-anchor="middle" font-size="46" font-weight="bold" fill="#5F5E5A">~$0.06</text>
+  <text x="915" y="310" text-anchor="middle" font-size="15" fill="#5F5E5A">ChatGPT app</text>
+  <text x="915" y="330" text-anchor="middle" font-size="13" fill="#8A9BB0">(est. $0.04–$0.09, GPT-5.1)</text>
+  <rect x="576" y="404" width="432" height="44" rx="6" fill="#ECEEF2"/>
+  <text x="792" y="432" text-anchor="middle" font-size="17" font-weight="bold" fill="#0A1628">Cost-competitive today — up to ~45% lower</text>
+
+  <!-- Card 3: why -->
+  <rect x="1064" y="140" width="496" height="330" rx="12" fill="#FFFFFF" stroke="#C8CED8" stroke-width="1.5"/>
+  <text x="1088" y="180" font-size="15" font-weight="bold" fill="#5F5E5A" letter-spacing="1.5">WHY — THE MODEL NEVER READS THE DATA</text>
+  <rect x="1088" y="204" width="200" height="52" rx="6" fill="#ECEEF2"/>
+  <text x="1188" y="226" text-anchor="middle" font-size="14" font-weight="bold" fill="#0A1628">Schema + 3 sample rows</text>
+  <text x="1188" y="245" text-anchor="middle" font-size="12.5" fill="#5F5E5A">only this goes to the AI</text>
+  <path d="M1288 230 L1318 230" stroke="#8A9BB0" stroke-width="2.5" fill="none"/>
+  <path d="M1312 224 L1320 230 L1312 236" stroke="#8A9BB0" stroke-width="2.5" fill="none"/>
+  <rect x="1326" y="204" width="200" height="52" rx="6" fill="#1B3A6B"/>
+  <text x="1426" y="226" text-anchor="middle" font-size="14" font-weight="bold" fill="#FFFFFF">AI writes analysis code</text>
+  <text x="1426" y="245" text-anchor="middle" font-size="12.5" fill="#9FB3D0">pandas, runs on our server</text>
+  <path d="M1426 262 L1426 286" stroke="#8A9BB0" stroke-width="2.5" fill="none"/>
+  <path d="M1420 280 L1426 288 L1432 280" stroke="#8A9BB0" stroke-width="2.5" fill="none"/>
+  <rect x="1326" y="294" width="200" height="52" rx="6" fill="#ECEEF2"/>
+  <text x="1426" y="316" text-anchor="middle" font-size="14" font-weight="bold" fill="#0A1628">Computed answer</text>
+  <text x="1426" y="335" text-anchor="middle" font-size="12.5" fill="#5F5E5A">calculated, not estimated</text>
+  <text x="1088" y="300" font-size="14.5" fill="#5F5E5A">The ChatGPT app pulls chunks of the</text>
+  <text x="1088" y="322" font-size="14.5" fill="#5F5E5A">file + its agent runtime into every</text>
+  <text x="1088" y="344" font-size="14.5" fill="#5F5E5A">request — tokens grow with the data.</text>
+  <rect x="1088" y="404" width="448" height="44" rx="6" fill="#0A1628"/>
+  <text x="1312" y="432" text-anchor="middle" font-size="17" font-weight="bold" fill="#FFFFFF">Every number is computed &amp; auditable</text>
+
+  <!-- Wide card: scaling -->
+  <rect x="40" y="498" width="1000" height="316" rx="12" fill="#FFFFFF" stroke="#C8CED8" stroke-width="1.5"/>
+  <text x="64" y="538" font-size="15" font-weight="bold" fill="#5F5E5A" letter-spacing="1.5">THE DECISIVE DIFFERENCE — COST AS FILES GROW</text>
+  <!-- legend -->
+  <rect x="700" y="524" width="14" height="14" rx="2" fill="#1B3A6B"/>
+  <text x="720" y="536" font-size="13.5" fill="#0A1628">Chat with Data</text>
+  <rect x="850" y="524" width="14" height="14" rx="2" fill="#8A9BB0"/>
+  <text x="870" y="536" font-size="13.5" fill="#0A1628">ChatGPT app</text>
+  <!-- baseline -->
+  <line x1="80" y1="740" x2="1000" y2="740" stroke="#C8CED8" stroke-width="1.5"/>
+  <!-- group 12k -->
+  <rect x="150" y="712" width="70" height="28" fill="#1B3A6B" rx="3"/>
+  <text x="185" y="704" text-anchor="middle" font-size="13.5" font-weight="bold" fill="#1B3A6B">$0.05</text>
+  <rect x="230" y="700" width="70" height="40" fill="#8A9BB0" rx="3"/>
+  <text x="265" y="692" text-anchor="middle" font-size="13.5" font-weight="bold" fill="#5F5E5A">~$0.06</text>
+  <text x="225" y="768" text-anchor="middle" font-size="15" font-weight="bold" fill="#0A1628">12,000 rows</text>
+  <!-- group 100k -->
+  <rect x="450" y="712" width="70" height="28" fill="#1B3A6B" rx="3"/>
+  <text x="485" y="704" text-anchor="middle" font-size="13.5" font-weight="bold" fill="#1B3A6B">$0.05</text>
+  <rect x="530" y="640" width="70" height="100" fill="#8A9BB0" rx="3"/>
+  <text x="565" y="632" text-anchor="middle" font-size="13.5" font-weight="bold" fill="#5F5E5A">~$0.12–0.18 est.</text>
+  <text x="525" y="768" text-anchor="middle" font-size="15" font-weight="bold" fill="#0A1628">100,000 rows</text>
+  <!-- group 500k -->
+  <rect x="750" y="712" width="70" height="28" fill="#1B3A6B" rx="3"/>
+  <text x="785" y="704" text-anchor="middle" font-size="13.5" font-weight="bold" fill="#1B3A6B">$0.05</text>
+  <g>
+    <rect x="830" y="580" width="70" height="160" fill="none" stroke="#8A9BB0" stroke-width="2" stroke-dasharray="6 4" rx="3"/>
+    <line x1="838" y1="596" x2="892" y2="724" stroke="#8A9BB0" stroke-width="2"/>
+    <line x1="892" y1="596" x2="838" y2="724" stroke="#8A9BB0" stroke-width="2"/>
+  </g>
+  <text x="865" y="572" text-anchor="middle" font-size="13.5" font-weight="bold" fill="#5F5E5A">exceeds model context</text>
+  <text x="805" y="768" text-anchor="middle" font-size="15" font-weight="bold" fill="#0A1628">500,000 rows</text>
+  <text x="64" y="800" font-size="13.5" fill="#8A9BB0" font-style="italic">Chat with Data stays flat: token use depends on the schema and the answer — never the row count.</text>
+
+  <!-- takeaway panel -->
+  <rect x="1064" y="498" width="496" height="316" rx="12" fill="#0A1628"/>
+  <text x="1088" y="540" font-size="15" font-weight="bold" fill="#9FE1CB" letter-spacing="1.5">BOTTOM LINE FOR LEADERSHIP</text>
+  <text x="1088" y="582" font-size="17.5" fill="#FFFFFF">5–8× more token-efficient today, and</text>
+  <text x="1088" y="608" font-size="17.5" fill="#FFFFFF">cost-competitive per question.</text>
+  <text x="1088" y="650" font-size="17.5" fill="#FFFFFF">At scale, the gap becomes decisive:</text>
+  <text x="1088" y="676" font-size="17.5" fill="#FFFFFF">our cost and reliability are <tspan font-weight="bold" fill="#9FE1CB">flat from</tspan></text>
+  <text x="1088" y="702" font-size="17.5" font-weight="bold" fill="#9FE1CB">12k to 500k rows.</text>
+  <text x="1088" y="744" font-size="17.5" fill="#FFFFFF">And every answer is <tspan font-weight="bold">computed and</tspan></text>
+  <text x="1088" y="770" font-size="17.5" fill="#FFFFFF"><tspan font-weight="bold">auditable</tspan> — not read-and-estimated.</text>
+
+  <!-- footnote -->
+  <text x="40" y="850" font-size="12.5" fill="#8A9BB0">Assumptions: Chat with Data figures measured by the app's built-in usage tracking (4,989 tokens, $0.046, Claude Sonnet via LiteLLM). ChatGPT token range self-reported by the ChatGPT app (25k-40k).</text>
+  <text x="40" y="868" font-size="12.5" fill="#8A9BB0">ChatGPT cost estimated at GPT-5.1 list rates (~$1.25/M input, $10/M output) - gateway rates may differ. 100k/500k ChatGPT figures are directional estimates; prompt caching may reduce repeat-question cost.</text>
+  <text x="40" y="886" font-size="12.5" fill="#8A9BB0">Internal use - General Atomics Aeronautical Systems - Chat with Data pilot</text>
+</svg>
