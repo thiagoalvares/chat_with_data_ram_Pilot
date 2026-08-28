@@ -6,7 +6,7 @@ from config import Config
 from logger import logger
 
 
-def _call(messages: list, temperature: float, max_tokens: int = None) -> Tuple[bool, str]:
+def _call(messages: list, temperature: float, max_tokens: int = None, force_json: bool = False) -> Tuple[bool, str]:
     """
     Raw HTTP POST to the LiteLLM proxy.
     No external library — uses requests only.
@@ -22,6 +22,10 @@ def _call(messages: list, temperature: float, max_tokens: int = None) -> Tuple[b
         "max_tokens":  max_tokens or Config.LLM_MAX_TOKENS,
         "temperature": temperature,
     }
+    # Force JSON mode for OpenAI models (GPT family) when requested
+    # This ensures valid JSON responses for answer generation with charts
+    if force_json and any(model in Config.LLM_MODEL.lower() for model in ['gpt', 'o1']):
+        body["response_format"] = {"type": "json_object"}
     # Log message details for debugging
     num_messages = len(messages)
     total_chars = sum(len(str(m.get('content', ''))) for m in messages)
@@ -89,6 +93,16 @@ def parse_answer_response(raw: str) -> Tuple[str, Optional[dict]]:
     try:
         cleaned = raw.strip()
 
+        # Strip common prefixes that some models (especially GPT) add before JSON
+        prefixes_to_remove = [
+            "Here's the answer:", "Here is the answer:", "Here's the result:",
+            "The result is:", "Based on the data:", "Here you go:",
+            "Sure, here you go:", "Certainly!", "Certainly,",
+        ]
+        for prefix in prefixes_to_remove:
+            if cleaned.lower().startswith(prefix.lower()):
+                cleaned = cleaned[len(prefix):].strip()
+
         # Strip any markdown fences (```json ... ``` or ``` ... ```)
         if "```" in cleaned:
             lines   = cleaned.split("\n")
@@ -121,6 +135,6 @@ def generate_query_code(messages: list) -> Tuple[bool, str]:
 
 def generate_human_answer(messages: list) -> Tuple[bool, str]:
     """Call 2 — convert result to plain English + optional chart spec."""
-    ok, content = _call(messages, temperature=0.3, max_tokens=4096)
+    ok, content = _call(messages, temperature=0.3, max_tokens=4096, force_json=True)
     #logger.info(f"Call 2 raw response: {repr(content[:500])}")
     return ok, content

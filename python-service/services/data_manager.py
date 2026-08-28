@@ -54,6 +54,9 @@ class SessionData:
         # Export support — stores last query result for Excel export
         self.last_result: Optional[Any] = None
 
+        # User model preference (session-scoped, overrides admin default)
+        self.user_model_preference: Optional[str] = None
+
     def get_history(self, mode: str) -> List[Dict]:
         """Get chat history for specific mode."""
         if mode == "standard":

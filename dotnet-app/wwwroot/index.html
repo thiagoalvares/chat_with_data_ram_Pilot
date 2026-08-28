@@ -108,6 +108,7 @@
     .main-title { font-size: 0.78rem; font-weight: 600; color: var(--text); }
     .mode-badge { font-size: 0.6rem; font-weight: 600; padding: 0.18rem 0.6rem; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.08em; background: var(--navy); color: #fff; }
     .live-badge { font-size: 0.6rem; font-weight: 700; padding: 0.18rem 0.6rem; border-radius: 3px; letter-spacing: 0.05em; background: linear-gradient(90deg, #0F6CBD, #00BCF2); color: #fff; white-space: nowrap; }
+    .model-badge { font-size: 0.6rem; font-weight: 600; padding: 0.18rem 0.6rem; border-radius: 3px; letter-spacing: 0.05em; background: #6B4C9A; color: #fff; white-space: nowrap; }
     .mode-badge.variance  { background: var(--navy-mid); }
     .mode-badge.msproject { background: #1a4a3a; }
 
@@ -276,6 +277,11 @@
     .btn-header:hover { filter: brightness(1.08); }
     .icon-btn { background: none; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; font-size: 0.85rem; padding: 0.25rem 0.5rem; color: var(--text2); transition: all 0.12s; }
     .icon-btn:hover { border-color: var(--navy); color: var(--navy); }
+
+    /* Model selector */
+    .model-select { font-family: var(--inter); font-size: 0.66rem; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 0.3rem 0.6rem; cursor: pointer; max-width: 180px; }
+    .model-select:hover { border-color: var(--navy); }
+    .model-select option { background: var(--bg); color: var(--text); }
 
     /* Dashboard */
     .dash-body { flex: 1; overflow-y: auto; padding: 1.2rem 1.6rem; display: none; }
@@ -470,12 +476,19 @@
         <div class="main-title" id="main-title">No data loaded</div>
         <div class="mode-badge" id="mode-badge">Standard</div>
         <div class="live-badge" id="live-badge" style="display:none" title="This workspace is connected to live corporate data sources"></div>
+        <div class="model-badge" id="model-badge" style="display:none" title="Currently using this AI model"></div>
       </div>
       <div class="header-actions">
         <div class="view-tabs">
           <button class="view-tab active" id="view-tab-chat" onclick="showView('chat')">Chat</button>
           <button class="view-tab" id="view-tab-dash" onclick="showView('dashboard')">Dashboard</button>
         </div>
+        <select class="model-select" id="model-select" onchange="changeModel()" title="Select AI model">
+          <option value="claude-sonnet-4-5">Claude Sonnet 4.5 ($3 / $15)</option>
+          <option value="gpt-5.4">GPT-5.4 ($2.50 / $15)</option>
+          <option value="gpt-4o">GPT-4o ($2.50 / $10)</option>
+          <option value="gpt-5.1">GPT-5.1 ($2 / $10)</option>
+        </select>
         <button class="btn-header" onclick="exportConversation()" title="Export this conversation to a Word document">↓ Export Report</button>
         <button class="icon-btn" onclick="showUsageDashboard()" title="My usage">📊</button>
         <button class="icon-btn" onclick="showSettingsModal()" title="Settings (API key)">⚙</button>
@@ -568,6 +581,7 @@ const CHART_COLORS = [
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   // MS Project / IMS init removed — this build is Standard + Variance only.
+  checkCurrentModel();  // Lightweight check: show badge if using non-default model
   setupTextarea();
   setupLogoUpload();
   setupDragDrop('zone-standard', 'file-standard');
@@ -2009,6 +2023,74 @@ async function showSettingsModal() {
       <button class="btn-plain-sm" onclick="closeOverlay('settings-overlay')" style="margin-right:0.5rem">Close</button>
       <button class="btn-primary-sm" id="settings-save-btn" onclick="saveApiKey('settings')">Save key</button>
     </div>`);
+}
+
+// ── Model selection ───────────────────────────────────────────────────────────
+const MODEL_NAMES = {
+  'claude-sonnet-4-5': 'Claude Sonnet 4.5',
+  'gpt-5.4': 'GPT-5.4',
+  'gpt-4o': 'GPT-4o',
+  'gpt-5.1': 'GPT-5.1'
+};
+
+async function checkCurrentModel() {
+  // Lightweight check on page load: show current model badge
+  try {
+    const res = await fetch('/api/user/get_model');
+    if (!res.ok) return;
+    const data = await res.json();
+
+    // Set dropdown to current model
+    const select = document.getElementById('model-select');
+    select.value = data.current_model;
+
+    // Always show badge with current model (default or not)
+    showModelBadge(data.current_model);
+  } catch (err) {
+    console.error('Failed to check current model:', err);
+  }
+}
+
+function showModelBadge(model) {
+  const badge = document.getElementById('model-badge');
+  const modelName = MODEL_NAMES[model] || model;
+  badge.textContent = `🤖 ${modelName}`;
+  badge.style.display = 'block';
+}
+
+function hideModelBadge() {
+  const badge = document.getElementById('model-badge');
+  badge.style.display = 'none';
+}
+
+async function changeModel() {
+  const select = document.getElementById('model-select');
+  const model = select.value;
+
+  try {
+    const res = await fetch('/api/user/set_model', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      alert(`Failed to change model: ${err.error || 'Unknown error'}`);
+      await checkCurrentModel();  // Reset to current
+      return;
+    }
+
+    const data = await res.json();
+    console.log(`Model changed to: ${data.model}${data.is_default ? ' (Admin Default)' : ''}`);
+
+    // Always show badge with current model
+    showModelBadge(data.model);
+  } catch (err) {
+    console.error('Failed to change model:', err);
+    alert('Failed to change model. Please try again.');
+    await checkCurrentModel();
+  }
 }
 
 // ── My usage ──────────────────────────────────────────────────────────────────

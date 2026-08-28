@@ -53,6 +53,9 @@ Machine learning rules:
 - When storing ML results always use a pandas DataFrame so the frontend can display and chart them cleanly.
 - Keep models simple and explainable — prefer Linear Regression, Random Forest, or Gradient Boosting over deep learning.
 - Write concise efficient code. Avoid redundant steps, excessive comments, and verbose variable names. Every line must serve a purpose.
+- For complex multi-step operations, plan your approach before coding: break into 2-3 clear intermediate steps with descriptive variable names (e.g., df_grouped, df_merged, summary).
+- Aim for code under 100 lines. If a task requires more, use intermediate DataFrames to improve readability and maintainability.
+- Ensure all string literals, parentheses, and brackets are properly closed before moving to the next line.
 
 Return executable Python code only. No explanations. No markdown. Nothing else."""
 

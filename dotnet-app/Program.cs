@@ -261,6 +261,8 @@ dataEndpoints.Add(app.MapGet("/export/debug_result", (HttpContext ctx, IHttpClie
 dataEndpoints.Add(app.MapGet ("/api/user/check_key",       (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/user/check_key")));
 dataEndpoints.Add(app.MapPost("/api/user/save_key",        (HttpContext ctx, IHttpClientFactory f) => ProxyJson(ctx, f, "/api/user/save_key")));
 dataEndpoints.Add(app.MapGet ("/api/user/get_key",         (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/user/get_key")));
+dataEndpoints.Add(app.MapPost("/api/user/set_model",       (HttpContext ctx, IHttpClientFactory f) => ProxyJson(ctx, f, "/api/user/set_model")));
+dataEndpoints.Add(app.MapGet ("/api/user/get_model",       (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/user/get_model")));
 dataEndpoints.Add(app.MapGet ("/api/user/usage/summary",   (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/user/usage/summary")));
 dataEndpoints.Add(app.MapGet ("/api/user/usage/chart",     (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/user/usage/chart")));
 dataEndpoints.Add(app.MapGet ("/api/user/usage/history",   (HttpContext ctx, IHttpClientFactory f) => ProxyGet (ctx, f, "/api/user/usage/history")));

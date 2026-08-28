@@ -12,11 +12,10 @@ DEFAULT_PRICING so tracking never fails.
 DEFAULT_PRICING = {"input": 2.00, "output": 10.00}
 
 MODEL_PRICING = {
-    "claude-sonnet-5":   {"input": 2.00,  "output": 10.00},
     "claude-sonnet-4-5": {"input": 3.00,  "output": 15.00},
-    "claude-opus-4":     {"input": 15.00, "output": 75.00},
     "gpt-5.4":           {"input": 2.50,  "output": 15.00},
     "gpt-4o":            {"input": 2.50,  "output": 10.00},
+    "gpt-5.1":           {"input": 2.00,  "output": 10.00},
 }
 
 

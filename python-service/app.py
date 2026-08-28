@@ -104,9 +104,10 @@ def _check_internal_secret():
         return jsonify({"error": "Unauthorized"}), 401
 
 
-def _resolve_user_context(username: str):
+def _resolve_user_context(username: str, session=None):
     """
     Look up the user, decrypt their API key, and read the active model.
+    Checks session for user's model preference, falls back to admin default.
     Returns ((user, api_key, model_name), None) on success or (None, flask_response).
     """
     user = db.get_user_by_username(username)
@@ -125,7 +126,12 @@ def _resolve_user_context(username: str):
             "error": "Your stored API key could not be read. Please re-enter it.",
             "needs_key": True,
         }), 401)
-    model_name = get_current_model_config()["model_name"]
+    # Check session for user's model preference, fall back to admin default
+    admin_default = get_current_model_config()["model_name"]
+    model_name = admin_default
+    if session and session.user_model_preference:
+        model_name = session.user_model_preference
+        logger.info(f"Using user-selected model: {model_name} (admin default: {admin_default})")
     return (user, api_key, model_name), None
 
 
@@ -317,7 +323,7 @@ def ask():
     # context that config.py serves to the untouched llm.py, and flushes the
     # captured token usage to the database afterwards.
     username = _username()
-    ctx, err = _resolve_user_context(username)
+    ctx, err = _resolve_user_context(username, sess)
     if err:
         return err
     user, user_key, model_name = ctx
@@ -410,7 +416,7 @@ def ask_refine():
 
     # Per-user key + model + usage tracking (same additive envelope as /ask)
     username = _username()
-    ctx, err = _resolve_user_context(username)
+    ctx, err = _resolve_user_context(username, sess)
     if err:
         return err
     user, user_key, model_name = ctx
@@ -616,6 +622,65 @@ def user_get_key():
     except Exception:
         masked = "(unreadable — please re-enter)"
     return jsonify({"masked_key": masked, "created_at": user["CreatedAt"], "updated_at": user["UpdatedAt"]})
+
+
+@api.route("/user/set_model", methods=["POST"])
+def user_set_model():
+    """
+    Store user's model preference in their session (overrides admin default).
+    Session-scoped — cleared on restart.
+    """
+    sid = _sid()
+    sess = get_session(sid)
+    body = request.get_json() or {}
+    model = body.get("model", "").strip()
+
+    # Allowed models (verified working with exact pricing)
+    ALLOWED_MODELS = [
+        "claude-sonnet-4-5", "gpt-5.4", "gpt-4o", "gpt-5.1"
+    ]
+
+    if not model:
+        # Clear user preference (revert to admin default)
+        sess.user_model_preference = None
+        save_session(sid, sess)
+        admin_default = get_current_model_config()["model_name"]
+        logger.info(f"User {_username()} cleared model preference, reverting to admin default: {admin_default}")
+        return jsonify({"success": True, "model": admin_default, "is_default": True})
+
+    if model not in ALLOWED_MODELS:
+        return jsonify({"error": f"Model not allowed. Choose from: {', '.join(ALLOWED_MODELS)}"}), 400
+
+    sess.user_model_preference = model
+    save_session(sid, sess)
+    logger.info(f"User {_username()} selected model: {model}")
+    return jsonify({"success": True, "model": model, "is_default": False})
+
+
+@api.route("/user/get_model", methods=["GET"])
+def user_get_model():
+    """
+    Return current active model (user preference or admin default) and available models.
+    """
+    sid = _sid()
+    sess = get_session(sid)
+    admin_default = get_current_model_config()["model_name"]
+    current_model = sess.user_model_preference or admin_default
+    is_default = sess.user_model_preference is None
+
+    ALLOWED_MODELS = [
+        {"value": "claude-sonnet-4-5", "label": "Claude Sonnet 4.5", "price": "$3 / $15"},
+        {"value": "gpt-5.4", "label": "GPT-5.4", "price": "$2.50 / $15"},
+        {"value": "gpt-4o", "label": "GPT-4o", "price": "$2.50 / $10"},
+        {"value": "gpt-5.1", "label": "GPT-5.1", "price": "$2 / $10"},
+    ]
+
+    return jsonify({
+        "current_model": current_model,
+        "is_default": is_default,
+        "admin_default": admin_default,
+        "available_models": ALLOWED_MODELS
+    })
 
 
 # ── Usage dashboards (rollout batch) ──────────────────────────────────────────
