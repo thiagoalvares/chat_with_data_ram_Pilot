@@ -41,12 +41,13 @@ DATA_DIR  = os.environ.get("DATA_DIR",  os.path.join("local_state", "fileshare")
 
 # Simple fields persisted as JSON metadata (everything that isn't a big frame/result).
 _META_FIELDS = (
-    "schema", "schema_a", "schema_b",
-    "filename", "label_a", "label_b",
+    "schema", "schema_a", "schema_b", "schema_c", "schema_d",
+    "filename", "label_a", "label_b", "label_c", "label_d",
     "history_standard", "history_variance",
+    "join_hints", "manual_mode",
 )
 # DataFrame slots persisted as Parquet on the "file share".
-_DF_FIELDS = ("df", "df_a", "df_b")
+_DF_FIELDS = ("df", "df_a", "df_b", "df_c", "df_d")
 
 
 # ── Memory backend ────────────────────────────────────────────────────────────

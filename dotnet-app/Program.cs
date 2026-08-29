@@ -238,6 +238,9 @@ async Task ProxyJson(HttpContext ctx, IHttpClientFactory factory, string targetP
 
 dataEndpoints.Add(app.MapPost("/ask",   (HttpContext ctx, IHttpClientFactory f) => ProxyJson(ctx, f, "/api/ask")));
 dataEndpoints.Add(app.MapPost("/ask/refine", (HttpContext ctx, IHttpClientFactory f) => ProxyJson(ctx, f, "/api/ask/refine")));
+dataEndpoints.Add(app.MapPost("/variance/accept_join", (HttpContext ctx, IHttpClientFactory f) => ProxyJson(ctx, f, "/api/variance/accept_join")));
+dataEndpoints.Add(app.MapPost("/variance/set_mode", (HttpContext ctx, IHttpClientFactory f) => ProxyJson(ctx, f, "/api/variance/set_mode")));
+dataEndpoints.Add(app.MapGet("/variance/get_joins", (HttpContext ctx, IHttpClientFactory f) => ProxyGet(ctx, f, "/api/variance/get_joins")));
 dataEndpoints.Add(app.MapPost("/clear", (HttpContext ctx, IHttpClientFactory f) => ProxyJson(ctx, f, "/api/clear")));
 dataEndpoints.Add(app.MapPost("/export/conversation", (HttpContext ctx, IHttpClientFactory f) => ProxyJson(ctx, f, "/api/export/conversation")));
 

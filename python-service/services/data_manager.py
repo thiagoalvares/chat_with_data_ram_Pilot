@@ -13,13 +13,23 @@ class SessionData:
         self.schema: Optional[str] = None
         self.filename: Optional[str] = None
 
-        # Variance mode
+        # Variance mode (supports up to 4 files)
         self.df_a: Optional[pd.DataFrame] = None
         self.df_b: Optional[pd.DataFrame] = None
+        self.df_c: Optional[pd.DataFrame] = None
+        self.df_d: Optional[pd.DataFrame] = None
         self.schema_a: Optional[str] = None
         self.schema_b: Optional[str] = None
-        self.label_a: str = "File A"
-        self.label_b: str = "File B"
+        self.schema_c: Optional[str] = None
+        self.schema_d: Optional[str] = None
+        self.label_a: str = "File 1"
+        self.label_b: str = "File 2"
+        self.label_c: str = "File 3"
+        self.label_d: str = "File 4"
+
+        # Variance mode — join suggestions (for multi-file linking)
+        self.join_hints: List[Dict] = []  # Accepted join suggestions
+        self.manual_mode: Optional[str] = None  # User's manual mode selection: 'variance', 'linking', or None (auto)
 
         # MS Project mode
         self.df_tasks: Optional[pd.DataFrame] = None
