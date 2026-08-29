@@ -80,6 +80,57 @@
     .label-input { width: 100%; border: 1px solid var(--border); border-radius: 4px; padding: 0.35rem 0.6rem; font-family: var(--inter); font-size: 0.75rem; color: var(--text); background: var(--bg); outline: none; margin-bottom: 0.4rem; transition: border-color 0.15s; }
     .label-input:focus { border-color: var(--navy-mid); }
 
+    /* Schema preview (expandable) */
+    .schema-preview { margin-bottom: 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); }
+    .schema-summary { padding: 0.5rem; cursor: pointer; font-size: 0.72rem; color: var(--text2); font-weight: 500; user-select: none; }
+    .schema-summary:hover { background: var(--bg2); }
+    .schema-content { padding: 0.5rem; border-top: 1px solid var(--border); font-family: var(--mono); font-size: 0.65rem; color: var(--text2); max-height: 150px; overflow-y: auto; }
+    .schema-content div { padding: 0.2rem 0; }
+
+    /* Join suggestions */
+    .join-suggestion { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem; margin-bottom: 0.5rem; font-size: 0.72rem; }
+    .join-suggestion-title { font-weight: 500; color: var(--text); margin-bottom: 0.3rem; }
+    .join-suggestion-details { color: var(--text2); font-size: 0.68rem; margin-bottom: 0.5rem; font-family: var(--mono); }
+    .join-suggestion-actions { display: flex; gap: 0.5rem; }
+    .btn-accept-join, .btn-reject-join { padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.68rem; cursor: pointer; border: 1px solid; transition: all 0.15s; }
+    .btn-accept-join { background: rgba(0,135,90,0.08); color: var(--success); border-color: var(--success); }
+    .btn-accept-join:hover { background: rgba(0,135,90,0.15); }
+    .btn-reject-join { background: rgba(100,100,100,0.08); color: var(--text2); border-color: var(--border2); }
+    .btn-reject-join:hover { background: rgba(100,100,100,0.15); }
+
+    /* Comparison Configuration Panel */
+    .comparison-config { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 0; margin-top: 0.5rem; }
+    .config-header { padding: 0.7rem; cursor: pointer; font-weight: 500; user-select: none; font-size: 0.8rem; }
+    .config-header:hover { background: var(--bg); }
+    .config-content { padding: 0 0.7rem 0.7rem; }
+    .config-section { margin-top: 0.9rem; }
+    .config-label { font-size: 0.72rem; font-weight: 500; color: var(--text); margin-bottom: 0.5rem; }
+    .files-summary { font-size: 0.7rem; color: var(--text2); }
+    .files-summary div { padding: 0.25rem 0; }
+    .file-item { display: flex; align-items: center; gap: 0.4rem; }
+    .file-item::before { content: '✓'; color: var(--success); font-weight: bold; }
+
+    /* Mode Selector */
+    .mode-selector { display: flex; flex-direction: column; gap: 0.6rem; }
+    .mode-option { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; transition: all 0.15s; }
+    .mode-option:hover { background: var(--bg); border-color: var(--navy-mid); }
+    .mode-option input[type="radio"] { margin-top: 0.2rem; cursor: pointer; }
+    .mode-label { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.72rem; }
+    .mode-label strong { color: var(--text); }
+    .mode-hint { font-size: 0.65rem; color: var(--text3); font-weight: normal; }
+
+    /* Quick Compare Buttons */
+    .quick-compare-buttons { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .btn-quick-compare { padding: 0.4rem 0.7rem; font-size: 0.68rem; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; transition: all 0.15s; color: var(--text2); }
+    .btn-quick-compare:hover { background: var(--navy-light); border-color: var(--navy-mid); color: var(--navy); }
+
+    /* Active Joins List */
+    .active-joins-list { font-size: 0.7rem; }
+    .active-join-item { display: flex; align-items: center; justify-content: space-between; padding: 0.4rem 0.6rem; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 0.4rem; font-family: var(--mono); }
+    .join-text { color: var(--text2); flex: 1; }
+    .btn-remove-join { padding: 0.2rem 0.5rem; font-size: 0.65rem; background: transparent; border: 1px solid var(--border2); border-radius: 3px; cursor: pointer; color: var(--text3); transition: all 0.15s; }
+    .btn-remove-join:hover { background: rgba(255,80,80,0.1); border-color: #ff5050; color: #ff5050; }
+
     /* Schema pills */
     #schema-list, .schema-list { display: flex; flex-wrap: wrap; gap: 0.25rem; }
     .pill { font-family: var(--mono); font-size: 0.6rem; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; padding: 0.12rem 0.45rem; color: var(--text2); }
@@ -430,11 +481,11 @@
       <!-- Variance mode -->
       <div class="mode-panel" id="panel-variance">
         <div class="sidebar-section">
-          <div class="section-label">Dataset A — Baseline</div>
+          <div class="section-label">FILE 1</div>
           <div class="upload-slot">
-            <input class="label-input" id="label-a" type="text" placeholder="Label (e.g. Budget, Jan 2025)" value="Baseline" title="Enter a custom label for this dataset (e.g., 'Budget 2025')"/>
+            <input class="label-input" id="label-a" type="text" placeholder="e.g., Budget 2024, Customers" value="File 1" title="Enter a custom label for this dataset"/>
             <div class="slot-hint" id="hint-a" style="display:none"></div>
-            <div class="upload-zone" id="zone-a" title="Upload your baseline/original dataset to compare against">
+            <div class="upload-zone" id="zone-a" title="Upload your first dataset">
               <input type="file" id="file-a" accept=".csv,.xlsx,.xls"/>
               <div class="upload-icon">📂</div>
               <div class="upload-text">CSV or XLSX</div>
@@ -443,17 +494,118 @@
           </div>
         </div>
         <div class="sidebar-section">
-          <div class="section-label">Dataset B — Current</div>
+          <div class="section-label">FILE 2</div>
           <div class="upload-slot">
-            <input class="label-input" id="label-b" type="text" placeholder="Label (e.g. Actuals, Feb 2025)" value="Current" title="Enter a custom label for this dataset (e.g., 'Actuals 2025')"/>
+            <input class="label-input" id="label-b" type="text" placeholder="e.g., Actuals 2025, Sales" value="File 2" title="Enter a custom label for this dataset"/>
             <div class="slot-hint" id="hint-b" style="display:none"></div>
-            <div class="upload-zone" id="zone-b" title="Upload your current/new dataset to compare with baseline">
+            <div class="upload-zone" id="zone-b" title="Upload your second dataset">
               <input type="file" id="file-b" accept=".csv,.xlsx,.xls"/>
               <div class="upload-icon">📂</div>
               <div class="upload-text">CSV or XLSX</div>
             </div>
             <div class="upload-status" id="status-b"></div>
           </div>
+        </div>
+        <div class="sidebar-section">
+          <div class="section-label">FILE 3 (Optional)</div>
+          <div class="upload-slot">
+            <input class="label-input" id="label-c" type="text" placeholder="e.g., Forecast 2025, Products" value="File 3" title="Enter a custom label for this dataset"/>
+            <div class="slot-hint" id="hint-c" style="display:none"></div>
+            <div class="upload-zone" id="zone-c" title="Upload your third dataset (optional)">
+              <input type="file" id="file-c" accept=".csv,.xlsx,.xls"/>
+              <div class="upload-icon">📂</div>
+              <div class="upload-text">CSV or XLSX</div>
+            </div>
+            <div class="upload-status" id="status-c"></div>
+          </div>
+        </div>
+        <div class="sidebar-section">
+          <div class="section-label">FILE 4 (Optional)</div>
+          <div class="upload-slot">
+            <input class="label-input" id="label-d" type="text" placeholder="e.g., Target 2025, Orders" value="File 4" title="Enter a custom label for this dataset"/>
+            <div class="slot-hint" id="hint-d" style="display:none"></div>
+            <div class="upload-zone" id="zone-d" title="Upload your fourth dataset (optional)">
+              <input type="file" id="file-d" accept=".csv,.xlsx,.xls"/>
+              <div class="upload-icon">📂</div>
+              <div class="upload-text">CSV or XLSX</div>
+            </div>
+            <div class="upload-status" id="status-d"></div>
+          </div>
+        </div>
+
+        <!-- Schema Previews (Expandable) -->
+        <div id="schema-previews" style="display:none; margin-top: 1rem;">
+          <div class="section-label">Column Preview</div>
+          <details class="schema-preview" id="schema-preview-a">
+            <summary class="schema-summary">📋 File 1 columns</summary>
+            <div class="schema-content" id="schema-content-a"></div>
+          </details>
+          <details class="schema-preview" id="schema-preview-b">
+            <summary class="schema-summary">📋 File 2 columns</summary>
+            <div class="schema-content" id="schema-content-b"></div>
+          </details>
+          <details class="schema-preview" id="schema-preview-c">
+            <summary class="schema-summary">📋 File 3 columns</summary>
+            <div class="schema-content" id="schema-content-c"></div>
+          </details>
+          <details class="schema-preview" id="schema-preview-d">
+            <summary class="schema-summary">📋 File 4 columns</summary>
+            <div class="schema-content" id="schema-content-d"></div>
+          </details>
+        </div>
+
+        <!-- Join Suggestions -->
+        <div id="join-suggestions-container" style="display:none; margin-top: 1rem;">
+          <div class="section-label">💡 Suggested Links</div>
+          <div id="join-suggestions"></div>
+        </div>
+
+        <!-- Comparison Configuration (Manual Controls) -->
+        <div id="comparison-config-container" style="display:none; margin-top: 1.5rem;">
+          <details class="comparison-config" id="comparison-config-panel">
+            <summary class="section-label config-header">⚙️ Comparison Configuration</summary>
+
+            <div class="config-content">
+              <!-- Files Summary -->
+              <div class="config-section">
+                <div class="config-label">Files Uploaded:</div>
+                <div id="files-summary" class="files-summary"></div>
+              </div>
+
+              <!-- Mode Selector -->
+              <div class="config-section">
+                <div class="config-label">Comparison Type:</div>
+                <div class="mode-selector">
+                  <label class="mode-option">
+                    <input type="radio" name="comparison-mode" value="variance" checked onchange="setComparisonMode('variance')">
+                    <span class="mode-label">
+                      <strong>Variance Analysis</strong>
+                      <span class="mode-hint">Same schema comparison (e.g., Budget vs Actuals)</span>
+                    </span>
+                  </label>
+                  <label class="mode-option">
+                    <input type="radio" name="comparison-mode" value="linking" onchange="setComparisonMode('linking')">
+                    <span class="mode-label">
+                      <strong>Linking Analysis</strong>
+                      <span class="mode-hint">Join different datasets (e.g., Customers + Sales)</span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Quick Comparisons -->
+              <div class="config-section" id="quick-compare-section" style="display:none;">
+                <div class="config-label">Quick Comparisons:</div>
+                <div class="quick-compare-buttons" id="quick-compare-buttons"></div>
+              </div>
+
+              <!-- Active Joins -->
+              <div class="config-section" id="active-joins-section" style="display:none;">
+                <div class="config-label">Active Joins:</div>
+                <div id="active-joins-list" class="active-joins-list"></div>
+              </div>
+            </div>
+          </details>
         </div>
       </div>
 
@@ -557,7 +709,7 @@ let nudgeDismissed  = { standard: false, variance: false };
 let modeTitles      = { standard: 'No data loaded', variance: 'No data loaded' };
 let modeMeta        = { standard: '', variance: '' };
 let modeReady       = { standard: false, variance: false };
-let varLoaded       = { a: false, b: false };
+let varLoaded       = { a: false, b: false, c: false, d: false };
 let pinned          = [];      // dashboard snapshots {id, question, answer, chartSpec, file, ts}
 let chartSpecs      = {};      // canvasId -> spec (for the type switcher + export)
 let dashCharts      = [];      // live Chart instances on the dashboard
@@ -587,15 +739,23 @@ document.addEventListener('DOMContentLoaded', () => {
   setupDragDrop('zone-standard', 'file-standard');
   setupDragDrop('zone-a',        'file-a');
   setupDragDrop('zone-b',        'file-b');
+  setupDragDrop('zone-c',        'file-c');
+  setupDragDrop('zone-d',        'file-d');
 
   document.getElementById('file-standard').addEventListener('change', e => {
     if (e.target.files[0]) handleUpload(e.target.files[0], 'standard', 'status-standard', 'zone-standard');
   });
   document.getElementById('file-a').addEventListener('change', e => {
-    if (e.target.files[0]) handleUpload(e.target.files[0], 'variance/a', 'status-a', 'zone-a', document.getElementById('label-a').value || 'File A');
+    if (e.target.files[0]) handleUpload(e.target.files[0], 'variance/a', 'status-a', 'zone-a', document.getElementById('label-a').value || 'File 1');
   });
   document.getElementById('file-b').addEventListener('change', e => {
-    if (e.target.files[0]) handleUpload(e.target.files[0], 'variance/b', 'status-b', 'zone-b', document.getElementById('label-b').value || 'File B');
+    if (e.target.files[0]) handleUpload(e.target.files[0], 'variance/b', 'status-b', 'zone-b', document.getElementById('label-b').value || 'File 2');
+  });
+  document.getElementById('file-c').addEventListener('change', e => {
+    if (e.target.files[0]) handleUpload(e.target.files[0], 'variance/c', 'status-c', 'zone-c', document.getElementById('label-c').value || 'File 3');
+  });
+  document.getElementById('file-d').addEventListener('change', e => {
+    if (e.target.files[0]) handleUpload(e.target.files[0], 'variance/d', 'status-d', 'zone-d', document.getElementById('label-d').value || 'File 4');
   });
 
   document.getElementById('debug-toggle').addEventListener('click', () => {
@@ -704,9 +864,11 @@ function onUploadSuccess(d, endpoint, statusEl, filename) {
     renderProfile(d.profile);
   } else {
     // Variance: track slots, auto-detect a date from the filename for the label
-    const slot = endpoint.split('/')[1];   // 'a' or 'b'
+    const slot = endpoint.split('/')[1];   // 'a', 'b', 'c', or 'd'
     varLoaded[slot] = true;
-    modeReady.variance = varLoaded.a && varLoaded.b;
+    // Minimum 2 files required for variance mode
+    const uploadedCount = Object.values(varLoaded).filter(v => v).length;
+    modeReady.variance = uploadedCount >= 2;
     const detected = detectDateFromFilename(filename);
     const hintEl = document.getElementById(`hint-${slot}`);
     if (detected && hintEl) { hintEl.textContent = `detected: ${detected}`; hintEl.style.display = 'block'; }
@@ -715,9 +877,19 @@ function onUploadSuccess(d, endpoint, statusEl, filename) {
     if (detected && labelEl && defaults.includes(labelEl.value.trim())) {
       labelEl.value = `${slot === 'a' ? 'Baseline' : 'Current'} (${detected})`;
     }
-    const la = document.getElementById('label-a').value || 'Baseline';
-    const lb = document.getElementById('label-b').value || 'Current';
-    modeTitles.variance = modeReady.variance ? `${la} vs ${lb}` : filename;
+    // Update variance title with all uploaded labels
+    updateVarianceTitle();
+
+    // Show schema preview for this slot
+    showSchemaPreview(slot, d.columns);
+
+    // Show join suggestions if any
+    if (d.join_suggestions && d.join_suggestions.length > 0) {
+      showJoinSuggestions(d.join_suggestions);
+    }
+
+    // Update comparison configuration panel
+    updateComparisonConfig();
   }
 
   if (mode === currentMode) {
@@ -2936,6 +3108,397 @@ async function toggleExpert(expertId, active) {
 }
 
 document.addEventListener('DOMContentLoaded', () => { refreshExperts(); });
+
+// ── Multi-file variance helpers (v2 expansion) ────────────────────────────────
+
+function updateVarianceTitle() {
+  // Update variance title with all uploaded file labels
+  const labels = [];
+  ['a', 'b', 'c', 'd'].forEach(slot => {
+    if (varLoaded[slot]) {
+      const labelEl = document.getElementById(`label-${slot}`);
+      if (labelEl) labels.push(labelEl.value || `File ${slot.toUpperCase()}`);
+    }
+  });
+  modeTitles.variance = labels.length > 0 ? labels.join(' + ') : 'Variance Analysis';
+  if (currentMode === 'variance') {
+    document.getElementById('main-title').textContent = modeTitles.variance;
+  }
+}
+
+function showSchemaPreview(slot, columns) {
+  // Show expandable schema preview for this slot
+  const previewContainer = document.getElementById('schema-previews');
+  const contentEl = document.getElementById(`schema-content-${slot}`);
+  const previewEl = document.getElementById(`schema-preview-${slot}`);
+
+  if (!contentEl || !previewEl) return;
+
+  // Build column list
+  const colList = columns.map(c => `<div>${c.name} <span style="color: var(--text3);">(${c.type})</span></div>`).join('');
+  contentEl.innerHTML = colList;
+
+  // Show preview container
+  previewContainer.style.display = 'block';
+  previewEl.style.display = 'block';
+}
+
+function showJoinSuggestions(suggestions) {
+  // Render join suggestion cards
+  const container = document.getElementById('join-suggestions-container');
+  const suggestionsEl = document.getElementById('join-suggestions');
+
+  if (!container || !suggestionsEl || suggestions.length === 0) return;
+
+  let html = '';
+  suggestions.forEach((sug, idx) => {
+    const confidence = Math.round(sug.confidence * 100);
+    const matchType = sug.match_type === 'exact' ? '✓ Exact match' : '~ Similar';
+    html += `
+      <div class="join-suggestion" id="join-sug-${idx}">
+        <div class="join-suggestion-title">${matchType} — ${confidence}% confidence</div>
+        <div class="join-suggestion-details">
+          ${sug.file1}.${sug.column1} ↔ ${sug.file2}.${sug.column2}
+        </div>
+        <div class="join-suggestion-actions">
+          <button class="btn-accept-join" onclick="acceptJoin(${idx}, ${JSON.stringify(sug).replace(/"/g, '&quot;')})">✓ Use this link</button>
+          <button class="btn-reject-join" onclick="rejectJoin(${idx})">Ignore</button>
+        </div>
+      </div>
+    `;
+  });
+
+  suggestionsEl.innerHTML = html;
+  container.style.display = 'block';
+}
+
+async function acceptJoin(idx, suggestion) {
+  // User accepted a join suggestion - send to backend
+  try {
+    const r = await fetch('/variance/accept_join', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(suggestion)
+    });
+    const d = await r.json();
+
+    if (r.ok && d.ok) {
+      // Show confirmation and hide this suggestion
+      const sugEl = document.getElementById(`join-sug-${idx}`);
+      if (sugEl) {
+        sugEl.style.background = 'rgba(0,135,90,0.08)';
+        sugEl.innerHTML = `<div style="color: var(--success); font-weight: 500;">✓ ${d.message}</div>`;
+        setTimeout(() => sugEl.remove(), 3000);
+      }
+
+      // Auto-select "Linking Analysis" radio button
+      const linkingRadio = document.querySelector('input[name="comparison-mode"][value="linking"]');
+      if (linkingRadio && !linkingRadio.checked) {
+        linkingRadio.checked = true;
+        setComparisonMode('linking');
+        console.log('✓ Auto-switched to Linking Analysis (join accepted)');
+      }
+
+      // UX Improvement: Auto-expand Comparison Configuration panel
+      const configPanel = document.getElementById('comparison-config-panel');
+      if (configPanel) {
+        configPanel.open = true;
+        console.log('✓ Auto-expanded Comparison Configuration panel');
+      }
+
+      // Update active joins display
+      updateActiveJoins();
+    } else {
+      alert(d.error || 'Failed to save join hint.');
+    }
+  } catch (e) {
+    alert('Network error: ' + e.message);
+  }
+}
+
+function rejectJoin(idx) {
+  // User rejected a join suggestion - just hide it
+  const sugEl = document.getElementById(`join-sug-${idx}`);
+  if (sugEl) sugEl.remove();
+
+  // Hide container if no more suggestions
+  const container = document.getElementById('join-suggestions');
+  if (container && container.children.length === 0) {
+    document.getElementById('join-suggestions-container').style.display = 'none';
+  }
+}
+
+// ── Comparison Configuration (Manual Controls) ───────────────────────────────
+
+let manualComparisonMode = null;  // null = auto-detect, 'variance', or 'linking'
+
+function updateComparisonConfig() {
+  // Update the Comparison Configuration panel based on uploaded files
+  const uploadedFiles = [];
+  ['a', 'b', 'c', 'd'].forEach(slot => {
+    if (varLoaded[slot]) {
+      const labelEl = document.getElementById(`label-${slot}`);
+      const label = labelEl ? labelEl.value : `File ${slot.toUpperCase()}`;
+      uploadedFiles.push({ slot, label });
+    }
+  });
+
+  const container = document.getElementById('comparison-config-container');
+  if (uploadedFiles.length >= 2) {
+    // Show the panel
+    container.style.display = 'block';
+
+    // Update files summary
+    const summaryEl = document.getElementById('files-summary');
+    summaryEl.innerHTML = uploadedFiles.map(f =>
+      `<div class="file-item">File ${f.slot.toUpperCase()}: ${f.label}</div>`
+    ).join('');
+
+    // Update quick buttons based on current mode
+    const currentMode = document.querySelector('input[name="comparison-mode"]:checked')?.value || 'variance';
+    if (currentMode === 'linking') {
+      updateQuickLinkingButtons(uploadedFiles);
+    } else {
+      updateQuickCompareButtons(uploadedFiles);
+    }
+
+    // Update active joins display
+    updateActiveJoins();
+  } else {
+    container.style.display = 'none';
+  }
+}
+
+async function setComparisonMode(mode) {
+  // User manually selected a comparison mode
+  manualComparisonMode = mode;
+  console.log(`Manual comparison mode set to: ${mode}`);
+
+  // Update UI feedback
+  const radios = document.querySelectorAll('input[name="comparison-mode"]');
+  radios.forEach(r => {
+    if (r.value === mode) {
+      r.parentElement.style.borderColor = 'var(--navy-mid)';
+      r.parentElement.style.background = 'var(--navy-light)';
+    } else {
+      r.parentElement.style.borderColor = 'var(--border)';
+      r.parentElement.style.background = 'transparent';
+    }
+  });
+
+  // Update quick buttons based on mode
+  const uploadedFiles = [];
+  ['a', 'b', 'c', 'd'].forEach(slot => {
+    if (varLoaded[slot]) {
+      const labelEl = document.getElementById(`label-${slot}`);
+      const label = labelEl ? labelEl.value : `File ${slot.toUpperCase()}`;
+      uploadedFiles.push({ slot, label });
+    }
+  });
+
+  if (uploadedFiles.length >= 2) {
+    if (mode === 'linking') {
+      updateQuickLinkingButtons(uploadedFiles);
+    } else {
+      updateQuickCompareButtons(uploadedFiles);
+      // Reset label for variance mode
+      const labelEl = document.querySelector('#quick-compare-section .config-label');
+      if (labelEl) {
+        labelEl.textContent = 'Quick Comparisons:';
+      }
+    }
+  }
+
+  // Send to backend
+  try {
+    const r = await fetch('/variance/set_mode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode })
+    });
+
+    if (!r.ok) {
+      console.error('Failed to set manual mode');
+    }
+  } catch (e) {
+    console.error('Error setting manual mode:', e);
+  }
+}
+
+function updateQuickCompareButtons(files) {
+  const section = document.getElementById('quick-compare-section');
+  const buttonsEl = document.getElementById('quick-compare-buttons');
+
+  if (files.length < 2) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = 'block';
+  const buttons = [];
+
+  // Generate pairwise comparison buttons
+  for (let i = 0; i < files.length; i++) {
+    for (let j = i + 1; j < files.length; j++) {
+      const f1 = files[i];
+      const f2 = files[j];
+      buttons.push(`
+        <button class="btn-quick-compare" onclick="quickCompare('${f1.slot}', '${f2.slot}')">
+          File ${f1.slot.toUpperCase()} vs ${f2.slot.toUpperCase()}
+        </button>
+      `);
+    }
+  }
+
+  // Add "Compare All" button if 3+ files
+  if (files.length >= 3) {
+    buttons.push(`
+      <button class="btn-quick-compare" onclick="quickCompareAll()">
+        Compare All ${files.length}
+      </button>
+    `);
+  }
+
+  buttonsEl.innerHTML = buttons.join('');
+}
+
+function quickCompare(slot1, slot2) {
+  // Pre-fill question input with comparison context
+  const label1 = document.getElementById(`label-${slot1}`).value;
+  const label2 = document.getElementById(`label-${slot2}`).value;
+
+  const questionInput = document.getElementById('q');
+  questionInput.value = `Compare ${label1} to ${label2}: `;
+  questionInput.focus();
+
+  // Move cursor to end
+  questionInput.setSelectionRange(questionInput.value.length, questionInput.value.length);
+}
+
+function quickCompareAll() {
+  const files = [];
+  ['a', 'b', 'c', 'd'].forEach(slot => {
+    if (varLoaded[slot]) {
+      const label = document.getElementById(`label-${slot}`).value;
+      files.push(label);
+    }
+  });
+
+  const questionInput = document.getElementById('q');
+  questionInput.value = `Compare all files (${files.join(', ')}): `;
+  questionInput.focus();
+  questionInput.setSelectionRange(questionInput.value.length, questionInput.value.length);
+}
+
+function updateQuickLinkingButtons(files) {
+  // Show data exploration buttons for linking mode
+  const section = document.getElementById('quick-compare-section');
+  const buttonsEl = document.getElementById('quick-compare-buttons');
+  const labelEl = document.querySelector('#quick-compare-section .config-label');
+
+  if (files.length < 2) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = 'block';
+
+  // Change section label for linking mode
+  if (labelEl) {
+    labelEl.textContent = 'Quick Data Exploration:';
+  }
+
+  // Get file names for context
+  const fileNames = files.map(f => f.label).join(', ');
+
+  const buttons = [];
+
+  // Button 1: List Columns/Joins
+  buttons.push(`
+    <button class="btn-quick-compare" onclick="quickLinkingAction('columns')" title="Show all available columns and join information">
+      📑 List Columns/Joins
+    </button>
+  `);
+
+  // Button 2: Show Linked Data
+  buttons.push(`
+    <button class="btn-quick-compare" onclick="quickLinkingAction('show_data')" title="Display a sample of the merged dataset">
+      📊 Show Linked Data
+    </button>
+  `);
+
+  buttonsEl.innerHTML = buttons.join('');
+}
+
+function quickLinkingAction(action) {
+  // Pre-fill question input with data exploration queries
+  const questionInput = document.getElementById('question-input');
+
+  switch(action) {
+    case 'show_data':
+      questionInput.value = 'Show me a sample of the linked data (10-15 rows) with the key columns used for joining and important columns from each file, formatted as a table.';
+      break;
+    case 'columns':
+      questionInput.value = 'List all available columns from the linked files, grouped by source file, with their data types. Indicate which columns were used as join keys. Indicate which file and columns they were linked to.';
+      break;
+  }
+
+  // UX Improvement: Auto-execute the question (click send button for user)
+  sendQuestion();
+}
+
+async function updateActiveJoins() {
+  // Fetch and display active joins from the session
+  const section = document.getElementById('active-joins-section');
+  const listEl = document.getElementById('active-joins-list');
+
+  try {
+    const r = await fetch('/variance/get_joins');
+    if (!r.ok) {
+      section.style.display = 'none';
+      return;
+    }
+
+    const d = await r.json();
+    const joins = d.joins || [];
+
+    if (joins.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+
+    section.style.display = 'block';
+    listEl.innerHTML = joins.map(j => `
+      <div class="active-join-item">
+        <span class="join-text">${j.file1}.${j.column1} ↔ ${j.file2}.${j.column2}</span>
+        <button class="btn-remove-join" onclick="removeJoin('${j.slot1}', '${j.column1}', '${j.slot2}', '${j.column2}')">×</button>
+      </div>
+    `).join('');
+  } catch (e) {
+    console.error('Error fetching active joins:', e);
+    section.style.display = 'none';
+  }
+}
+
+async function removeJoin(slot1, col1, slot2, col2) {
+  // Remove a join hint from the session
+  try {
+    const r = await fetch('/variance/remove_join', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slot1, column1: col1, slot2, column2: col2 })
+    });
+
+    if (r.ok) {
+      updateActiveJoins();  // Refresh the display
+    } else {
+      alert('Failed to remove join.');
+    }
+  } catch (e) {
+    console.error('Error removing join:', e);
+  }
+}
+
 </script>
 </body>
 </html>

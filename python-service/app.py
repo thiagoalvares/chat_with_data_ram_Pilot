@@ -33,7 +33,7 @@ from flask import Blueprint, Flask, jsonify, request, send_file
 from config import Config
 from logger import logger
 from models.schemas import DebugEntry
-from prompts import standard, variance
+from prompts import standard, variance, linking
 from services import llm as llm_service
 from services import insights
 from services import request_context, usage_capture
@@ -192,7 +192,7 @@ def _run_pipeline(code_messages: list, answer_messages_fn, debug: list,
     # ── Call 1: generate code ──────────────────────────────────────────────────
     ok, code = llm_service.generate_query_code(code_messages)
     if not ok:
-        return False, code, None, debug, None, None, None
+        return False, code, None, debug, None, None, None, None
     debug.append(DebugEntry("Generated code", code))
 
     # ── Execute ────────────────────────────────────────────────────────────────
@@ -207,7 +207,7 @@ def _run_pipeline(code_messages: list, answer_messages_fn, debug: list,
             success, result_str, raw_result, metadata = execute_generated_code(code2, prev_result=prev_result, **dataframes)
         if not success:
             debug.append(DebugEntry("Retry also failed", result_str))
-            return False, "I wasn't able to compute an answer for that question. Try rephrasing it.", None, debug, None, None, None
+            return False, "I wasn't able to compute an answer for that question. Try rephrasing it.", None, debug, None, None, None, None
 
     debug.append(DebugEntry("Query result", result_str))
 
@@ -223,6 +223,159 @@ def _run_pipeline(code_messages: list, answer_messages_fn, debug: list,
 
 
 # ── Upload (Standard + Variance) ──────────────────────────────────────────────
+
+def _analyze_join_suggestions(sess, new_slot: str):
+    """
+    Analyze potential join keys between existing files and newly uploaded file.
+    Returns list of suggested joins sorted by confidence (0-1 score).
+    """
+    from difflib import SequenceMatcher
+
+    def get_column_priority(col_name: str) -> int:
+        """
+        Assign priority score to column names.
+        Higher scores = better join key candidates.
+
+        Priority levels:
+        - 3 (HIGH): ID fields, codes, keys
+        - 2 (MEDIUM): Numbers, identifiers
+        - 1 (LOW): Descriptive fields (name, description)
+        - 0 (VERY LOW): Aggregated values (cost, amount, total, date)
+        """
+        col_lower = str(col_name).lower()
+
+        # HIGH priority: ID fields and codes
+        if col_lower.endswith('id') or col_lower.endswith('_id'):
+            return 3
+        if col_lower.endswith('code') or col_lower.endswith('_code'):
+            return 3
+        if 'key' in col_lower or col_lower.endswith('num') or col_lower.endswith('number'):
+            return 3
+        if col_lower in ['id', 'code', 'key', 'identifier']:
+            return 3
+
+        # VERY LOW priority: Aggregated values and dates (bad join keys)
+        if any(x in col_lower for x in ['cost', 'amount', 'total', 'price', 'value', 'sum']):
+            return 0
+        if any(x in col_lower for x in ['date', 'time', 'period', 'year', 'month', 'day']):
+            return 0
+
+        # LOW priority: Descriptive text fields
+        if any(x in col_lower for x in ['name', 'description', 'desc', 'title', 'label']):
+            return 1
+
+        # MEDIUM priority: Everything else (category fields, etc.)
+        return 2
+
+    suggestions = []
+    new_df = getattr(sess, f"df_{new_slot}", None)
+    new_label = getattr(sess, f"label_{new_slot}", f"File {new_slot.upper()}")
+
+    if new_df is None:
+        return suggestions
+
+    new_cols = set(new_df.columns)
+
+    # Compare with all other uploaded files
+    for other_slot in ["a", "b", "c", "d"]:
+        if other_slot == new_slot:
+            continue
+
+        other_df = getattr(sess, f"df_{other_slot}", None)
+        if other_df is None:
+            continue
+
+        other_label = getattr(sess, f"label_{other_slot}", f"File {other_slot.upper()}")
+        other_cols = set(other_df.columns)
+
+        # Find column matches (exact or fuzzy)
+        for new_col in new_cols:
+            for other_col in other_cols:
+                # Exact match
+                if new_col == other_col:
+                    # Calculate value overlap
+                    new_vals = set(new_df[new_col].dropna().astype(str))
+                    other_vals = set(other_df[other_col].dropna().astype(str))
+                    if len(new_vals) > 0 and len(other_vals) > 0:
+                        overlap = len(new_vals & other_vals) / min(len(new_vals), len(other_vals))
+                        if overlap > 0.1:  # At least 10% overlap
+                            priority = (get_column_priority(new_col) + get_column_priority(other_col)) / 2
+                            suggestions.append({
+                                "file1": new_label,
+                                "file2": other_label,
+                                "slot1": new_slot,
+                                "slot2": other_slot,
+                                "column1": new_col,
+                                "column2": other_col,
+                                "confidence": overlap,
+                                "match_type": "exact",
+                                "priority": priority,
+                            })
+                # Fuzzy match (only for different column names)
+                elif new_col != other_col:
+                    # Apply abbreviation expansion before fuzzy matching
+                    COMMON_ABBREV = {
+                        'num': 'number', 'acct': 'account', 'cust': 'customer',
+                        'qty': 'quantity', 'amt': 'amount', 'dt': 'date',
+                        'id': 'identifier', 'desc': 'description', 'addr': 'address',
+                        'proj': 'project', 'emp': 'employee', 'dept': 'department'
+                    }
+
+                    def expand_abbrev(col_name):
+                        """Expand common abbreviations in column names."""
+                        col_lower = str(col_name).lower()
+                        for abbrev, full in COMMON_ABBREV.items():
+                            col_lower = col_lower.replace(abbrev, full)
+                        return col_lower
+
+                    new_col_expanded = expand_abbrev(new_col)
+                    other_col_expanded = expand_abbrev(other_col)
+
+                    similarity = SequenceMatcher(None, new_col_expanded, other_col_expanded).ratio()
+                    if similarity > 0.6:  # 60% similarity threshold (lowered from 70%)
+                        # Calculate value overlap
+                        new_vals = set(new_df[new_col].dropna().astype(str))
+                        other_vals = set(other_df[other_col].dropna().astype(str))
+                        if len(new_vals) > 0 and len(other_vals) > 0:
+                            overlap = len(new_vals & other_vals) / min(len(new_vals), len(other_vals))
+                            if overlap > 0.1:
+                                priority = (get_column_priority(new_col) + get_column_priority(other_col)) / 2
+                                suggestions.append({
+                                    "file1": new_label,
+                                    "file2": other_label,
+                                    "slot1": new_slot,
+                                    "slot2": other_slot,
+                                    "column1": new_col,
+                                    "column2": other_col,
+                                    "confidence": overlap * similarity,  # Combined score
+                                    "match_type": "fuzzy",
+                                    "priority": priority,
+                                })
+
+    # Remove true duplicates (same files + same columns)
+    # Keep suggestions that show different file pairings
+    seen_pairs = set()
+    unique_suggestions = []
+    for sug in suggestions:
+        # Key includes both column names AND file slots to preserve different pairings
+        pair_key = (
+            tuple(sorted([sug["slot1"], sug["slot2"]])),
+            tuple(sorted([sug["column1"], sug["column2"]]))
+        )
+        if pair_key not in seen_pairs:
+            seen_pairs.add(pair_key)
+            unique_suggestions.append(sug)
+
+    # Sort by multiple criteria (all descending):
+    # 1. Match type (exact first)
+    # 2. Column priority (ID/Code fields first)
+    # 3. Confidence (overlap score)
+    unique_suggestions.sort(
+        key=lambda x: (x["match_type"] == "exact", x["priority"], x["confidence"]),
+        reverse=True
+    )
+    return unique_suggestions[:6]
+
 
 def _handle_upload(file, slot: str, sess, sheet_name: str = None) -> dict:
     """Shared upload logic (verbatim from prototype upload.py)."""
@@ -291,8 +444,8 @@ def upload_standard():
 
 @api.route("/upload/variance/<slot>", methods=["POST"])
 def upload_variance(slot: str):
-    if slot not in ("a", "b"):
-        return jsonify({"error": "Invalid slot. Use 'a' or 'b'"}), 400
+    if slot not in ("a", "b", "c", "d"):
+        return jsonify({"error": "Invalid slot. Use 'a', 'b', 'c', or 'd'"}), 400
     sid  = _sid()
     sess = get_session(sid)
     # Tab-scoped clear: a new Variance file only resets the Variance conversation.
@@ -301,8 +454,65 @@ def upload_variance(slot: str):
     setattr(sess, f"label_{slot}", label)
     result = _handle_upload(request.files.get("file"), slot, sess, request.form.get("sheet_name"))
     if "ok" in result:
+        # Analyze join suggestions for multi-file linking (for any slot after the first)
+        # This triggers when uploading File 2, 3, or 4
+        if slot in ("b", "c", "d"):
+            join_suggestions = _analyze_join_suggestions(sess, slot)
+            result["join_suggestions"] = join_suggestions
         save_session(sid, sess)
     return jsonify(result), (400 if "error" in result else 200)
+
+
+@api.route("/variance/accept_join", methods=["POST"])
+def accept_join():
+    """User accepted a suggested join - store it in join_hints for the prompt."""
+    sid = _sid()
+    sess = get_session(sid)
+    body = request.get_json() or {}
+
+    join_hint = {
+        "slot1": body.get("slot1"),
+        "slot2": body.get("slot2"),
+        "column1": body.get("column1"),
+        "column2": body.get("column2"),
+        "file1": body.get("file1"),
+        "file2": body.get("file2"),
+    }
+
+    # Add to join hints if not already present
+    if join_hint not in sess.join_hints:
+        sess.join_hints.append(join_hint)
+
+    save_session(sid, sess)
+    logger.info(f"Join accepted | {join_hint['file1']}.{join_hint['column1']} ↔ {join_hint['file2']}.{join_hint['column2']}")
+
+    return jsonify({"ok": True, "message": f"Link saved: {join_hint['file1']}.{join_hint['column1']} ↔ {join_hint['file2']}.{join_hint['column2']}"}), 200
+
+
+@api.route("/variance/set_mode", methods=["POST"])
+def set_manual_mode():
+    """Allow user to manually select variance or linking mode."""
+    sid = _sid()
+    sess = get_session(sid)
+    body = request.get_json() or {}
+
+    mode = body.get("mode")  # 'variance', 'linking', or null for auto
+    if mode not in (None, "variance", "linking"):
+        return jsonify({"error": "Invalid mode. Use 'variance', 'linking', or null"}), 400
+
+    sess.manual_mode = mode
+    save_session(sid, sess)
+    logger.info(f"Manual mode set to: {mode}")
+
+    return jsonify({"ok": True, "mode": mode}), 200
+
+
+@api.route("/variance/get_joins", methods=["GET"])
+def get_active_joins():
+    """Return the list of active joins for display in the UI."""
+    sid = _sid()
+    sess = get_session(sid)
+    return jsonify({"joins": sess.join_hints}), 200
 
 
 # ── Ask (the two-call pipeline) ───────────────────────────────────────────────
@@ -336,6 +546,142 @@ def ask():
         request_context.end(ctx_tokens)
 
 
+def _parse_simple_join(question: str, sess) -> list:
+    """
+    Extract join hints from natural language patterns in the question.
+
+    Patterns supported:
+    - "Link File 1 CustomerID to File 2 CustID"
+    - "Link CustomerID to CustID"
+    - "CustomerID = CustID"
+    - "Join on AccountNum to AcctID"
+
+    Returns list of join hint dicts compatible with linking.py
+    """
+    import re
+
+    hints = []
+    question_lower = question.lower()
+
+    # Pattern 1: "Link File X ColumnA to File Y ColumnB"
+    pattern1 = r'link\s+file\s+(\d+)\s+(\w+)\s+to\s+file\s+(\d+)\s+(\w+)'
+    matches = re.findall(pattern1, question_lower, re.IGNORECASE)
+    for match in matches:
+        file1_num, col1, file2_num, col2 = match
+        slot_map = {'1': 'a', '2': 'b', '3': 'c', '4': 'd'}
+        slot1 = slot_map.get(file1_num)
+        slot2 = slot_map.get(file2_num)
+        if slot1 and slot2:
+            label1 = getattr(sess, f"label_{slot1}", f"File {file1_num}")
+            label2 = getattr(sess, f"label_{slot2}", f"File {file2_num}")
+            hints.append({
+                "slot1": slot1,
+                "slot2": slot2,
+                "column1": col1.title(),  # Capitalize
+                "column2": col2.title(),
+                "file1": label1,
+                "file2": label2,
+            })
+
+    # Pattern 2: "Link ColumnA to ColumnB" (infer files from context)
+    pattern2 = r'link\s+(\w+)\s+to\s+(\w+)'
+    matches = re.findall(pattern2, question_lower, re.IGNORECASE)
+    for match in matches:
+        col1, col2 = match
+        # Simple heuristic: assume first 2 uploaded files
+        uploaded = [s for s in ['a', 'b', 'c', 'd'] if getattr(sess, f"df_{s}", None) is not None]
+        if len(uploaded) >= 2:
+            slot1, slot2 = uploaded[0], uploaded[1]
+            label1 = getattr(sess, f"label_{slot1}", f"File {slot1.upper()}")
+            label2 = getattr(sess, f"label_{slot2}", f"File {slot2.upper()}")
+            hints.append({
+                "slot1": slot1,
+                "slot2": slot2,
+                "column1": col1.title(),
+                "column2": col2.title(),
+                "file1": label1,
+                "file2": label2,
+            })
+
+    # Pattern 3: "ColumnA = ColumnB" or "join on ColumnA to ColumnB"
+    pattern3 = r'(\w+)\s*=\s*(\w+)'
+    matches = re.findall(pattern3, question_lower)
+    for match in matches:
+        col1, col2 = match
+        uploaded = [s for s in ['a', 'b', 'c', 'd'] if getattr(sess, f"df_{s}", None) is not None]
+        if len(uploaded) >= 2:
+            slot1, slot2 = uploaded[0], uploaded[1]
+            label1 = getattr(sess, f"label_{slot1}", f"File {slot1.upper()}")
+            label2 = getattr(sess, f"label_{slot2}", f"File {slot2.upper()}")
+            hints.append({
+                "slot1": slot1,
+                "slot2": slot2,
+                "column1": col1.title(),
+                "column2": col2.title(),
+                "file1": label1,
+                "file2": label2,
+            })
+
+    logger.info(f"Parsed {len(hints)} join hints from question: {hints}")
+    return hints
+
+
+def _detect_analysis_mode(sess) -> str:
+    """
+    Determine if this is traditional variance or multi-file linking.
+
+    Returns "variance" if:
+    - Only files A & B uploaded
+    - Schemas are 80%+ similar
+    - No explicit join hints
+
+    Returns "linking" if:
+    - 3+ files uploaded
+    - OR 2 files with different schemas
+    - OR explicit join hints present
+    - OR user manually selected linking mode
+    """
+    # Check for manual mode override
+    if sess.manual_mode:
+        logger.info(f"Mode detection: {sess.manual_mode} (manual override)")
+        return sess.manual_mode
+
+    # Count uploaded files
+    uploaded_slots = []
+    for slot in ["a", "b", "c", "d"]:
+        if getattr(sess, f"df_{slot}", None) is not None:
+            uploaded_slots.append(slot)
+
+    # If 3+ files, definitely linking mode
+    if len(uploaded_slots) >= 3:
+        logger.info("Mode detection: linking (3+ files)")
+        return "linking"
+
+    # If explicit join hints exist, use linking mode
+    if sess.join_hints:
+        logger.info("Mode detection: linking (join hints present)")
+        return "linking"
+
+    # If only 2 files (a and b), check schema similarity
+    if len(uploaded_slots) == 2 and "a" in uploaded_slots and "b" in uploaded_slots:
+        schema_a = set(sess.df_a.columns)
+        schema_b = set(sess.df_b.columns)
+        common_cols = schema_a & schema_b
+        total_cols = schema_a | schema_b
+        similarity = len(common_cols) / len(total_cols) if total_cols else 0
+
+        if similarity >= 0.8:
+            logger.info(f"Mode detection: variance (schema similarity {similarity:.0%})")
+            return "variance"
+        else:
+            logger.info(f"Mode detection: linking (schema similarity {similarity:.0%} < 80%)")
+            return "linking"
+
+    # Default to variance for 2-file traditional use case
+    logger.info("Mode detection: variance (default for 2 files)")
+    return "variance"
+
+
 def _ask_pipeline(sid, sess, question, mode):
     """The original /ask body, moved verbatim (logic identical to the prototype flow)."""
     debug = []
@@ -358,19 +704,60 @@ def _ask_pipeline(sid, sess, question, mode):
         )
 
     elif mode == "variance":
-        if sess.df_a is None or sess.df_b is None:
-            return jsonify({"error": "Please upload both files before asking questions."}), 400
+        # Check minimum files uploaded (at least 2)
+        uploaded_count = sum(1 for slot in ["a", "b", "c", "d"] if getattr(sess, f"df_{slot}", None) is not None)
+        if uploaded_count < 2:
+            return jsonify({"error": "Please upload at least 2 files before asking questions."}), 400
+
+        # Detect analysis mode: variance (same schema comparison) vs linking (multi-file join)
+        analysis_mode = _detect_analysis_mode(sess)
         prev_result = getattr(sess, "last_result", None)
         prev_result_meta = _get_prev_result_meta(prev_result, max_chars=1000)
-        code_msgs = variance.build_code_gen_prompt(
-            sess.schema_a, sess.schema_b, sess.label_a, sess.label_b, question,
-            error_feedback=None, history=history, prev_result_meta=prev_result_meta,
-        )
-        success, answer, chart, debug, raw_result, result_str, metadata, formatting = _run_pipeline(
-            code_msgs,
-            lambda r, m: variance.build_answer_gen_prompt(question, r, sess.label_a, sess.label_b, history, m),
-            debug, prev_result=prev_result, df_a=sess.df_a, df_b=sess.df_b,
-        )
+
+        if analysis_mode == "variance":
+            # EXISTING CODE - traditional 2-file variance analysis
+            code_msgs = variance.build_code_gen_prompt(
+                sess.schema_a, sess.schema_b, sess.label_a, sess.label_b, question,
+                error_feedback=None, history=history, prev_result_meta=prev_result_meta,
+            )
+            success, answer, chart, debug, raw_result, result_str, metadata, formatting = _run_pipeline(
+                code_msgs,
+                lambda r, m: variance.build_answer_gen_prompt(question, r, sess.label_a, sess.label_b, history, m),
+                debug, prev_result=prev_result, df_a=sess.df_a, df_b=sess.df_b,
+            )
+
+        elif analysis_mode == "linking":
+            # NEW CODE - multi-file linking analysis
+            # Gather all uploaded dataframes, schemas, and labels
+            dfs = {}
+            schemas = {}
+            labels = {}
+            for slot in ["a", "b", "c", "d"]:
+                df = getattr(sess, f"df_{slot}", None)
+                if df is not None:
+                    dfs[slot] = df
+                    schemas[slot] = getattr(sess, f"schema_{slot}")
+                    labels[slot] = getattr(sess, f"label_{slot}")
+
+            # Parse natural language join hints from question
+            parsed_hints = _parse_simple_join(question, sess)
+
+            # Merge with stored join hints (accepted from UI)
+            all_hints = sess.join_hints + parsed_hints
+
+            # Build linking prompts
+            code_msgs = linking.build_code_gen_prompt(
+                schemas, labels, question, join_hints=all_hints,
+                error_feedback=None, history=history, prev_result_meta=prev_result_meta,
+            )
+
+            # Execute with all dataframes passed dynamically
+            df_kwargs = {f"df_{slot}": df for slot, df in dfs.items()}
+            success, answer, chart, debug, raw_result, result_str, metadata, formatting = _run_pipeline(
+                code_msgs,
+                lambda r, m: linking.build_answer_gen_prompt(question, r, labels, history, m),
+                debug, prev_result=prev_result, **df_kwargs
+            )
 
     else:
         return jsonify({"error": f"Unknown mode: {mode}. This service supports 'standard' and 'variance'."}), 400
