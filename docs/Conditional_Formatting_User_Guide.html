@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conditional Formatting Guide - Chat with Data</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a2463 0%, #1e3a8a 50%, #3b5998 100%);
+            padding: 40px 20px;
+            color: #2d3748;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #0a2463 0%, #1e3a8a 100%);
+            color: white;
+            padding: 40px 40px 50px 40px;
+            text-align: center;
+            position: relative;
+            border-bottom: 4px solid #60a5fa;
+        }
+
+        .header-logo {
+            max-width: 180px;
+            height: auto;
+            margin-bottom: 30px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .header h1 {
+            font-size: 38px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+            color: white;
+        }
+
+        .header p {
+            font-size: 18px;
+            opacity: 0.9;
+            font-weight: 400;
+            color: #e0e7ff;
+        }
+
+        .content {
+            padding: 50px 40px;
+        }
+
+        .intro {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .intro h2 {
+            font-size: 32px;
+            color: #0a2463;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .intro p {
+            font-size: 18px;
+            color: #64748b;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .keyword-box {
+            background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%);
+            border-left: 4px solid #3b82f6;
+            padding: 20px 25px;
+            margin: 30px 0 50px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+        }
+
+        .keyword-box strong {
+            color: #1e40af;
+            font-size: 16px;
+        }
+
+        .keyword-box .keywords {
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .keyword-box .keyword {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+        }
+
+        .tier-section {
+            margin-bottom: 50px;
+        }
+
+        .tier-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 3px solid #e2e8f0;
+        }
+
+        .tier-badge {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-weight: 600;
+            font-size: 15px;
+            margin-right: 20px;
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+            border: 2px solid #bae6fd;
+        }
+
+        .tier-section:nth-child(2) .tier-badge {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            border-color: #93c5fd;
+        }
+
+        .tier-section:nth-child(3) .tier-badge {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+            border-color: #c4b5fd;
+        }
+
+        .tier-header h3 {
+            font-size: 28px;
+            color: #0f172a;
+            flex: 1;
+            font-weight: 600;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .condition-card {
+            background: linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%);
+            border: 2px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 25px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .condition-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 28px rgba(59, 130, 246, 0.2);
+            border-color: #60a5fa;
+        }
+
+        .condition-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #0ea5e9 0%, #3b82f6 50%, #8b5cf6 100%);
+        }
+
+        .condition-card h4 {
+            font-size: 19px;
+            color: #1e40af;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+        }
+
+        .condition-card h4::before {
+            content: '●';
+            color: #3b82f6;
+            margin-right: 10px;
+            font-size: 20px;
+        }
+
+        .condition-card p {
+            color: #64748b;
+            line-height: 1.6;
+            margin-bottom: 15px;
+            font-size: 15px;
+        }
+
+        .example-box {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .example-box .label {
+            font-weight: 600;
+            color: #475569;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .example-box .query {
+            background: white;
+            border-left: 3px solid #3b82f6;
+            padding: 12px 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #1e293b;
+            line-height: 1.5;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .color-legend {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .color-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .color-box {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 1px solid #cbd5e1;
+        }
+
+        .color-box.red { background: #FFC7CE; }
+        .color-box.yellow { background: #FFEB9C; }
+        .color-box.green { background: #C6EFCE; }
+
+        .tips-section {
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            border-radius: 12px;
+            padding: 30px;
+            margin-top: 50px;
+            border: 2px solid #93c5fd;
+            box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
+        }
+
+        .tips-section h3 {
+            color: #1e40af;
+            font-size: 24px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+        }
+
+        .tips-section h3::before {
+            content: '💡';
+            margin-right: 12px;
+            font-size: 28px;
+        }
+
+        .tips-section ul {
+            list-style: none;
+            color: #1e293b;
+        }
+
+        .tips-section li {
+            padding: 10px 0;
+            padding-left: 30px;
+            position: relative;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .tips-section li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #0ea5e9;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .footer {
+            background: linear-gradient(135deg, #0a2463 0%, #1e3a8a 100%);
+            padding: 30px 40px;
+            text-align: center;
+            color: #bae6fd;
+            font-size: 14px;
+            border-top: 4px solid #60a5fa;
+        }
+
+        .footer p {
+            margin: 5px 0;
+        }
+
+        .footer strong {
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 30px 20px 40px 20px;
+            }
+
+            .header-logo {
+                max-width: 140px;
+                margin-bottom: 20px;
+            }
+
+            .header h1 {
+                font-size: 28px;
+            }
+
+            .content {
+                padding: 30px 20px;
+            }
+
+            .cards-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .tier-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .tier-badge {
+                margin-bottom: 15px;
+            }
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .container {
+                box-shadow: none;
+            }
+
+            .condition-card {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="data:image/jpeg;base64,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" alt="General Atomics Logo" class="header-logo">
+            <h1>Conditional Formatting Guide</h1>
+            <p>Powerful Data Highlighting with Natural Language</p>
+        </div>
+
+        <div class="content">
+            <div class="intro">
+                <h2>How It Works</h2>
+                <p>
+                    Simply ask your question and mention what you want to highlight. Our AI will automatically
+                    apply color coding to both your chat results and Excel exports. No complex formulas needed!
+                </p>
+            </div>
+
+            <div class="keyword-box">
+                <strong>🔑 Trigger Words:</strong> Include any of these keywords in your question to activate conditional formatting:
+                <div class="keywords">
+                    <span class="keyword">highlight</span>
+                    <span class="keyword">color</span>
+                    <span class="keyword">red</span>
+                    <span class="keyword">yellow</span>
+                    <span class="keyword">green</span>
+                    <span class="keyword">warn</span>
+                    <span class="keyword">flag</span>
+                </div>
+            </div>
+
+            <!-- TIER 1: BASIC -->
+            <div class="tier-section">
+                <div class="tier-header">
+                    <div class="tier-badge">TIER 1</div>
+                    <h3>Basic Conditions</h3>
+                </div>
+
+                <div class="cards-grid">
+                    <!-- Numeric Conditions -->
+                    <div class="condition-card">
+                        <h4>Numeric Comparisons</h4>
+                        <p>Highlight values based on numeric thresholds using <, >, <=, >=, ==, or !=</p>
+                        <div class="example-box">
+                            <div class="label">Example Query</div>
+                            <div class="query">"Show me sales by region and highlight anything below $1M in red"</div>
+                        </div>
+                        <div class="color-legend">
+                            <div class="color-item">
+                                <div class="color-box red"></div>
+                                <span>Below threshold</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Text Exact Match -->
+                    <div class="condition-card">
+                        <h4>Text Exact Match</h4>
+                        <p>Highlight rows where text matches exactly (case-insensitive)</p>
+                        <div class="example-box">
+                            <div class="label">Example Query</div>
+                            <div class="query">"Show all reports and highlight ones owned by Thiago Alvares in yellow"</div>
+                        </div>
+                        <div class="color-legend">
+                            <div class="color-item">
+                                <div class="color-box yellow"></div>
+                                <span>Exact match</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Null/Empty -->
+                    <div class="condition-card">
+                        <h4>Null or Empty Values</h4>
+                        <p>Identify missing data by highlighting null or empty cells</p>
+                        <div class="example-box">
+                            <div class="label">Example Query</div>
+                            <div class="query">"Show customer list and highlight missing email addresses in red"</div>
+                        </div>
+                        <div class="color-legend">
+                            <div class="color-item">
+                                <div class="color-box red"></div>
+                                <span>Missing data</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TIER 2: INTERMEDIATE -->
+            <div class="tier-section">
+                <div class="tier-header">
+                    <div class="tier-badge">TIER 2</div>
+                    <h3>Intermediate Conditions</h3>
+                </div>
+
+                <div class="cards-grid">
+                    <!-- Text Contains -->
+                    <div class="condition-card">
+                        <h4>Text Contains/Starts/Ends</h4>
+                        <p>Flexible text matching: contains substring, starts with, or ends with specific text</p>
+                        <div class="example-box">
+                            <div class="label">Example Query</div>
+                            <div class="query">"Show project list and highlight anything containing 'Forecast' in green"</div>
+                        </div>
+                        <div class="color-legend">
+                            <div class="color-item">
+                                <div class="color-box green"></div>
+                                <span>Pattern match</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Date Conditions -->
+                    <div class="condition-card">
+                        <h4>Date Comparisons</h4>
+                        <p>Compare dates to find overdue items, upcoming deadlines, or specific date ranges</p>
+                        <div class="example-box">
+                            <div class="label">Example Query</div>
+                            <div class="query">"Show tasks and highlight anything due before today in red"</div>
+                        </div>
+                        <div class="color-legend">
+                            <div class="color-item">
+                                <div class="color-box red"></div>
+                                <span>Overdue items</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row-Level -->
+                    <div class="condition-card">
+                        <h4>Row-Level Highlighting</h4>
+                        <p>Highlight entire rows instead of just individual cells when conditions match</p>
+                        <div class="example-box">
+                            <div class="label">Example Query</div>
+                            <div class="query">"Show all projects and highlight entire rows where status is 'Failed' in red"</div>
+                        </div>
+                        <div class="color-legend">
+                            <div class="color-item">
+                                <div class="color-box red"></div>
+                                <span>Full row</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TIER 3: ADVANCED -->
+            <div class="tier-section">
+                <div class="tier-header">
+                    <div class="tier-badge">TIER 3</div>
+                    <h3>Advanced Conditions</h3>
+                </div>
+
+                <div class="cards-grid">
+                    <!-- Top/Bottom N -->
+                    <div class="condition-card">
+                        <h4>Top N / Bottom N</h4>
+                        <p>Automatically find and highlight the highest or lowest N values</p>
+                        <div class="example-box">
+                            <div class="label">Example Query</div>
+                            <div class="query">"Show revenue by customer and highlight the top 5 in green"</div>
+                        </div>
+                        <div class="color-legend">
+                            <div class="color-item">
+                                <div class="color-box green"></div>
+                                <span>Top performers</span>
+                            </div>
+                            <div class="color-item">
+                                <div class="color-box red"></div>
+                                <span>Bottom performers</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cross-Column -->
+                    <div class="condition-card">
+                        <h4>Cross-Column Comparison</h4>
+                        <p>Compare two columns and highlight where one exceeds the other</p>
+                        <div class="example-box">
+                            <div class="label">Example Query</div>
+                            <div class="query">"Show budget vs actual and highlight where actual exceeds budget in red"</div>
+                        </div>
+                        <div class="color-legend">
+                            <div class="color-item">
+                                <div class="color-box red"></div>
+                                <span>Over budget</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Multiple Conditions -->
+                    <div class="condition-card">
+                        <h4>Multiple Conditions (AND)</h4>
+                        <p>Combine multiple criteria - all conditions must be true</p>
+                        <div class="example-box">
+                            <div class="label">Example Query</div>
+                            <div class="query">"Show tasks and highlight where status is 'Failed' AND priority is 'High' in red"</div>
+                        </div>
+                        <div class="color-legend">
+                            <div class="color-item">
+                                <div class="color-box red"></div>
+                                <span>All conditions met</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tips Section -->
+            <div class="tips-section">
+                <h3>Pro Tips for Best Results</h3>
+                <ul>
+                    <li>Be specific about what you want highlighted and which color to use</li>
+                    <li>Combine multiple conditions in one query: "highlight X in red and Y in green"</li>
+                    <li>Works in both chat tables and Excel exports - same formatting everywhere</li>
+                    <li>Column names must match exactly as they appear in your data</li>
+                    <li>Use "entire row" or "whole row" to highlight full rows instead of individual cells</li>
+                    <li>Try different color combinations: red for warnings, yellow for caution, green for success</li>
+                    <li>Formatting persists when you refine your question or export to Excel</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>Chat with Data</strong> - Conditional Formatting Guide v2.0</p>
+            <p>© 2026 General Atomics Aeronautical Systems. For pilot program participants.</p>
+        </div>
+    </div>
+</body>
+</html>

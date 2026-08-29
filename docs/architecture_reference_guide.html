@@ -1,0 +1,1908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat with Data - Technical Architecture Reference</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --ga-navy: #003057;
+      --ga-blue: #0066B3;
+      --ga-light-blue: #4A90E2;
+      --ga-gray: #6C7A89;
+      --ga-light-gray: #E8EBED;
+      --ga-dark: #1A1A1A;
+      --ga-accent: #00A3E0;
+      --ga-success: #28A745;
+      --ga-warning: #FFC107;
+    }
+
+    body {
+      font-family: 'Segoe UI', 'Arial', sans-serif;
+      background: var(--ga-light-gray);
+      color: var(--ga-dark);
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+      background: white;
+      box-shadow: 0 0 40px rgba(0,0,0,0.1);
+    }
+
+    .header {
+      background: linear-gradient(135deg, var(--ga-navy) 0%, var(--ga-blue) 100%);
+      color: white;
+      padding: 2rem 3rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 4px solid var(--ga-accent);
+    }
+
+    .header-left {
+      flex: 1;
+    }
+
+    .header-left h1 {
+      font-size: 2.2rem;
+      font-weight: 300;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.5px;
+    }
+
+    .header-left .subtitle {
+      font-size: 1rem;
+      opacity: 0.9;
+      font-weight: 300;
+    }
+
+    .logo-container {
+      width: 220px;
+      height: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-container img {
+      max-width: 100%;
+      max-height: 70px;
+      height: auto;
+      object-fit: contain;
+    }
+
+    .meta-info {
+      background: var(--ga-light-gray);
+      padding: 1rem 3rem;
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      color: var(--ga-gray);
+      border-bottom: 1px solid #ddd;
+    }
+
+    .meta-info .item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .meta-info .label {
+      font-weight: 600;
+      color: var(--ga-navy);
+    }
+
+    .tabs {
+      display: flex;
+      background: white;
+      border-bottom: 3px solid var(--ga-navy);
+      overflow-x: auto;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .tab {
+      padding: 1.2rem 2rem;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--ga-gray);
+      transition: all 0.2s;
+      border-bottom: 4px solid transparent;
+      white-space: nowrap;
+      letter-spacing: 0.3px;
+    }
+
+    .tab:hover {
+      background: var(--ga-light-gray);
+      color: var(--ga-navy);
+    }
+
+    .tab.active {
+      color: var(--ga-navy);
+      border-bottom-color: var(--ga-accent);
+      background: white;
+    }
+
+    .content {
+      padding: 3rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.3s;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    h2 {
+      color: var(--ga-navy);
+      font-size: 2rem;
+      font-weight: 300;
+      margin: 2rem 0 1.5rem;
+      padding-bottom: 0.8rem;
+      border-bottom: 3px solid var(--ga-accent);
+    }
+
+    h3 {
+      color: var(--ga-blue);
+      font-size: 1.5rem;
+      font-weight: 400;
+      margin: 2rem 0 1rem;
+    }
+
+    .architecture-flow {
+      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      padding: 3rem;
+      border-radius: 8px;
+      margin: 2rem 0;
+      border: 1px solid #dee2e6;
+    }
+
+    .flow-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 2rem;
+      margin: 2rem 0;
+      flex-wrap: wrap;
+    }
+
+    .flow-box {
+      background: white;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      text-align: center;
+      min-width: 200px;
+      border: 2px solid var(--ga-blue);
+      transition: all 0.3s;
+    }
+
+    .flow-box:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+      border-color: var(--ga-accent);
+    }
+
+    .flow-box .icon {
+      font-size: 3rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .flow-box .title {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--ga-navy);
+      margin-bottom: 0.5rem;
+    }
+
+    .flow-box .desc {
+      font-size: 0.85rem;
+      color: var(--ga-gray);
+      line-height: 1.4;
+    }
+
+    .flow-arrow {
+      font-size: 2.5rem;
+      color: var(--ga-blue);
+      font-weight: bold;
+    }
+
+    .component-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .component-card {
+      background: white;
+      border: 2px solid var(--ga-light-gray);
+      border-left: 6px solid var(--ga-blue);
+      padding: 1.8rem;
+      border-radius: 8px;
+      transition: all 0.3s;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    .component-card:hover {
+      border-left-color: var(--ga-accent);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+      transform: translateY(-2px);
+    }
+
+    .component-card.core { border-left-color: var(--ga-navy); }
+    .component-card.infra { border-left-color: var(--ga-blue); }
+    .component-card.security { border-left-color: var(--ga-success); }
+
+    .component-card .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+    }
+
+    .component-card .file-name {
+      font-family: 'Courier New', monospace;
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--ga-navy);
+      background: var(--ga-light-gray);
+      padding: 0.5rem 0.8rem;
+      border-radius: 4px;
+      flex: 1;
+    }
+
+    .component-card .badge {
+      display: inline-block;
+      background: var(--ga-blue);
+      color: white;
+      padding: 0.3rem 0.8rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-left: 0.5rem;
+    }
+
+    .component-card.core .badge { background: var(--ga-navy); }
+    .component-card.security .badge { background: var(--ga-success); }
+
+    .component-card .card-desc {
+      font-size: 0.9rem;
+      line-height: 1.7;
+      color: #495057;
+    }
+
+    .component-card .card-desc code {
+      background: var(--ga-light-gray);
+      padding: 0.2rem 0.5rem;
+      border-radius: 3px;
+      font-size: 0.85em;
+      color: var(--ga-navy);
+      font-weight: 600;
+    }
+
+    .pipeline-sequence {
+      background: white;
+      border: 2px solid var(--ga-light-gray);
+      border-radius: 8px;
+      padding: 2rem;
+      margin: 2rem 0;
+    }
+
+    .pipeline-step {
+      display: flex;
+      align-items: flex-start;
+      margin: 2rem 0;
+      padding: 1.5rem;
+      background: linear-gradient(90deg, #f8f9fa 0%, white 100%);
+      border-radius: 8px;
+      border-left: 5px solid var(--ga-blue);
+      transition: all 0.3s;
+    }
+
+    .pipeline-step:hover {
+      border-left-color: var(--ga-accent);
+      background: linear-gradient(90deg, #e9ecef 0%, white 100%);
+    }
+
+    .pipeline-step .step-num {
+      background: var(--ga-blue);
+      color: white;
+      width: 45px;
+      height: 45px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.3rem;
+      margin-right: 1.5rem;
+      flex-shrink: 0;
+      box-shadow: 0 3px 8px rgba(0,102,179,0.3);
+    }
+
+    .pipeline-step .step-content {
+      flex: 1;
+    }
+
+    .pipeline-step .step-title {
+      font-weight: 700;
+      color: var(--ga-navy);
+      margin-bottom: 0.5rem;
+      font-size: 1.15rem;
+    }
+
+    .pipeline-step .step-desc {
+      color: #6c757d;
+      font-size: 0.9rem;
+      line-height: 1.7;
+    }
+
+    .pipeline-step .step-file {
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+      color: var(--ga-gray);
+      margin-top: 0.8rem;
+      padding: 0.4rem 0.8rem;
+      background: var(--ga-light-gray);
+      border-radius: 4px;
+      display: inline-block;
+    }
+
+    .info-box {
+      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      border-left: 6px solid var(--ga-blue);
+      padding: 2rem;
+      border-radius: 8px;
+      margin: 2rem 0;
+    }
+
+    .info-box.warning {
+      border-left-color: var(--ga-warning);
+      background: linear-gradient(135deg, #fff9e6 0%, #fffbf0 100%);
+    }
+
+    .info-box.success {
+      border-left-color: var(--ga-success);
+      background: linear-gradient(135deg, #e8f5e9 0%, #f1f8f2 100%);
+    }
+
+    .info-box h3 {
+      margin-top: 0;
+      color: var(--ga-navy);
+      font-size: 1.3rem;
+      margin-bottom: 1rem;
+    }
+
+    .info-box p {
+      line-height: 1.8;
+      color: #495057;
+      margin-bottom: 1rem;
+    }
+
+    .info-box ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .info-box li {
+      padding: 0.5rem 0;
+      padding-left: 1.8rem;
+      position: relative;
+      line-height: 1.7;
+    }
+
+    .info-box li:before {
+      content: "▸";
+      position: absolute;
+      left: 0;
+      color: var(--ga-blue);
+      font-weight: 700;
+      font-size: 1.2rem;
+    }
+
+    .info-box.warning li:before { color: var(--ga-warning); }
+    .info-box.success li:before { color: var(--ga-success); }
+
+    .feature-list {
+      background: white;
+      border: 2px solid var(--ga-light-gray);
+      border-radius: 8px;
+      padding: 2rem;
+      margin: 2rem 0;
+    }
+
+    .feature-list h4 {
+      color: var(--ga-navy);
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+
+    .feature-list ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .feature-list li {
+      padding: 0.7rem 0;
+      padding-left: 2rem;
+      position: relative;
+      border-bottom: 1px solid var(--ga-light-gray);
+      line-height: 1.7;
+    }
+
+    .feature-list li:last-child {
+      border-bottom: none;
+    }
+
+    .feature-list li:before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: var(--ga-success);
+      font-weight: 700;
+      font-size: 1.3rem;
+    }
+
+    .feature-list strong {
+      color: var(--ga-navy);
+    }
+
+    .tech-stack {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin: 2rem 0;
+    }
+
+    .tech-item {
+      background: white;
+      border: 2px solid var(--ga-light-gray);
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      color: var(--ga-navy);
+      transition: all 0.3s;
+    }
+
+    .tech-item:hover {
+      border-color: var(--ga-blue);
+      background: var(--ga-light-gray);
+    }
+
+    code {
+      background: var(--ga-light-gray);
+      padding: 0.2rem 0.5rem;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--ga-navy);
+      font-weight: 600;
+    }
+
+    .key-point {
+      background: white;
+      border-left: 6px solid var(--ga-accent);
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    .key-point .kp-title {
+      font-weight: 700;
+      color: var(--ga-navy);
+      margin-bottom: 0.5rem;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .key-point .kp-icon {
+      font-size: 1.5rem;
+    }
+
+    .key-point .kp-desc {
+      color: #495057;
+      line-height: 1.7;
+    }
+
+    .footer {
+      background: var(--ga-navy);
+      color: white;
+      padding: 2rem 3rem;
+      text-align: center;
+      font-size: 0.85rem;
+      opacity: 0.9;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      margin: 2rem 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border: 2px solid var(--ga-light-gray);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    th {
+      background: var(--ga-navy);
+      color: white;
+      padding: 1rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    td {
+      padding: 1rem;
+      border-bottom: 1px solid var(--ga-light-gray);
+      font-size: 0.9rem;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover {
+      background: #f8f9fa;
+    }
+
+    @media print {
+      .tabs { position: static; }
+      .tab-content { display: block !important; page-break-after: always; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-left">
+        <h1>Chat with Data</h1>
+        <div class="subtitle">Technical Architecture Reference Guide</div>
+      </div>
+      <div class="logo-container">
+        <img src="data:image/jpeg;base64,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" alt="General Atomics Aeronautical Systems, Inc." />
+      </div>
+    </div>
+
+    <div class="meta-info">
+      <div class="item">
+        <span class="label">Version:</span>
+        <span>Production v2.0</span>
+      </div>
+      <div class="item">
+        <span class="label">Architecture:</span>
+        <span>Single-Server In-RAM (Pilot Edition)</span>
+      </div>
+      <div class="item">
+        <span class="label">Target:</span>
+        <span>ITS · Development Teams · Technical Reference</span>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="showTab(0)">Overview</button>
+      <button class="tab" onclick="showTab(1)">Architecture</button>
+      <button class="tab" onclick="showTab(2)">Core Components</button>
+      <button class="tab" onclick="showTab(3)">Infrastructure</button>
+      <button class="tab" onclick="showTab(4)">Request Pipeline</button>
+      <button class="tab" onclick="showTab(5)">Security & Auth</button>
+      <button class="tab" onclick="showTab(6)">Deployment</button>
+    </div>
+
+    <div class="content">
+      <!-- TAB 0: Overview -->
+      <div class="tab-content active">
+        <h2>System Overview</h2>
+
+        <p style="font-size: 1.1rem; line-height: 1.8; color: #495057; margin: 2rem 0;">
+          Chat with Data is an AI-powered data analysis platform that enables users to query uploaded datasets using natural language.
+          The system generates executable pandas code, runs it against the data, and returns human-readable answers with optional visualizations.
+          Every numerical result comes from executed code, not AI estimation.
+        </p>
+
+        <div class="architecture-flow">
+          <h3 style="color: var(--ga-navy); margin-top: 0;">High-Level Data Flow</h3>
+          <div class="flow-row">
+            <div class="flow-box">
+              <div class="icon">🌐</div>
+              <div class="title">Browser</div>
+              <div class="desc">User uploads CSV/Excel<br>Asks questions</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box">
+              <div class="icon">🏗️</div>
+              <div class="title">.NET Frontend</div>
+              <div class="desc">ASP.NET Core 8.0<br>Port 5080<br>UI + Session</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box">
+              <div class="icon">🐍</div>
+              <div class="title">Python Backend</div>
+              <div class="desc">Flask REST API<br>Port 8000<br>Data + AI Pipeline</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box">
+              <div class="icon">🤖</div>
+              <div class="title">LiteLLM Gateway</div>
+              <div class="desc">AI Model Proxy<br>Usage Tracking</div>
+            </div>
+          </div>
+        </div>
+
+        <h2>Key Architectural Principles</h2>
+
+        <div class="info-box warning">
+          <h3>⚠️ The Golden Rule: Analytical Core Immutability</h3>
+          <p>The analytical core is <strong>byte-for-byte identical</strong> to the validated prototype. These files are production-frozen and never modified:</p>
+          <ul>
+            <li><code>services/llm.py</code> — Two-call LLM pipeline (code generation → answer generation)</li>
+            <li><code>services/executor.py</code> — Secure pandas code execution in isolated namespace</li>
+            <li><code>services/file_handler.py</code> — CSV/Excel reading and schema extraction</li>
+            <li><code>prompts/standard.py</code> — System prompts for Standard mode</li>
+            <li><code>prompts/variance.py</code> — System prompts for Variance mode</li>
+          </ul>
+          <p><strong>All production features are implemented as infrastructure layers around this core.</strong> This design ensures the proven analytical logic remains unchanged while adding enterprise capabilities.</p>
+        </div>
+
+        <h2>Technical Specifications</h2>
+
+        <div class="tech-stack">
+          <div class="tech-item">.NET 8.0</div>
+          <div class="tech-item">Python 3.10+</div>
+          <div class="tech-item">Flask</div>
+          <div class="tech-item">Pandas</div>
+          <div class="tech-item">SQLite + WAL</div>
+          <div class="tech-item">Waitress WSGI</div>
+          <div class="tech-item">Chart.js</div>
+          <div class="tech-item">Fernet Encryption</div>
+        </div>
+
+        <h2>Production Features</h2>
+
+        <div class="feature-list">
+          <h4>Enterprise Capabilities</h4>
+          <ul>
+            <li><strong>Per-User API Keys:</strong> Every user provides their own LiteLLM key (Fernet encrypted at rest)</li>
+            <li><strong>Session-Based Model Selection:</strong> Users choose AI model per session (4 verified models with pricing)</li>
+            <li><strong>Exact Usage Tracking:</strong> Token-level cost tracking with model-specific pricing</li>
+            <li><strong>Admin Dashboard:</strong> Global model selection, usage analytics, user management</li>
+            <li><strong>Data Experts:</strong> Admin-published datasets with access control (public or restricted)</li>
+            <li><strong>Live Data Sources:</strong> Query-backed experts (Azure Blob Storage, SQL Server/Azure SQL)</li>
+            <li><strong>Export Capabilities:</strong> Word reports, Excel data, PNG charts</li>
+            <li><strong>Dark Mode:</strong> User preference with persistent storage</li>
+          </ul>
+        </div>
+
+        <h2>Design Philosophy</h2>
+
+        <div class="key-point">
+          <div class="kp-title">
+            <span class="kp-icon">🧱</span>
+            Infrastructure as a Harness
+          </div>
+          <div class="kp-desc">
+            All enterprise features are implemented as <strong>wrappers, proxies, and envelopes</strong> around the analytical core.
+            This "harness" approach allows feature development without touching validated logic. Per-user keys, usage tracking,
+            and model selection all operate via request context and proxies—the core files remain unchanged.
+          </div>
+        </div>
+
+        <div class="key-point">
+          <div class="kp-title">
+            <span class="kp-icon">🧵</span>
+            Thread-Safe Single Process
+          </div>
+          <div class="kp-desc">
+            Runs as ONE Python process with multiple threads (I/O-bound workload). Per-request state (API keys, models)
+            managed via Python's contextvars for thread-safety. Session data stored in-RAM for fast follow-ups.
+            <strong>Never run multiple workers</strong>—this would split in-RAM sessions across processes.
+          </div>
+        </div>
+
+        <div class="key-point">
+          <div class="kp-title">
+            <span class="kp-icon">🎯</span>
+            Zero Estimation Principle
+          </div>
+          <div class="kp-desc">
+            Every number comes from executed pandas code, not AI guesses. The LLM generates code → code executes →
+            LLM explains the result. Prompt engineering enforces: "All numbers must come DIRECTLY from the data. Never estimate."
+          </div>
+        </div>
+
+        <h2>Deployment Constraints</h2>
+
+        <div class="info-box warning">
+          <h3>Critical: Single Process Architecture</h3>
+          <ul>
+            <li><strong>ONE Python process only</strong> — Multiple workers would split in-RAM session storage</li>
+            <li><strong>Threads for concurrency</strong> — Workload is I/O-bound (waiting on LLM), threads handle load</li>
+            <li><strong>Restart clears sessions</strong> — No persistence by design (acceptable for pilot scale)</li>
+            <li><strong>Scale up, not out</strong> — Increase CPU/RAM on one server, don't add servers</li>
+            <li><strong>For multi-server scale-out</strong> — Use the alternate repo with SQL Server + file share backend</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- TAB 1: Architecture -->
+      <div class="tab-content">
+        <h2>System Architecture</h2>
+
+        <div class="architecture-flow">
+          <h3 style="color: var(--ga-navy); margin-top: 0;">Component Interaction</h3>
+          <div class="flow-row">
+            <div class="flow-box">
+              <div class="icon">🌐</div>
+              <div class="title">Browser Client</div>
+              <div class="desc">
+                • HTML/CSS/JavaScript<br>
+                • Chart.js visualization<br>
+                • Session cookie (cwd_sid)
+              </div>
+            </div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-arrow">↓</div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-box">
+              <div class="icon">🏗️</div>
+              <div class="title">.NET Frontend Layer</div>
+              <div class="desc">
+                • ASP.NET Core 8.0 (Port 5080)<br>
+                • Session management<br>
+                • HTTP proxy to Python<br>
+                • Windows Authentication (optional)
+              </div>
+            </div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-arrow">↓ HTTP + X-Session-Id + X-User</div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-box">
+              <div class="icon">🐍</div>
+              <div class="title">Python Backend Layer</div>
+              <div class="desc">
+                • Flask REST API (Port 8000)<br>
+                • ONE process + threads<br>
+                • In-RAM session storage<br>
+                • Analytical core + harness
+              </div>
+            </div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-arrow">↓ HTTPS + Bearer Token</div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-box">
+              <div class="icon">🤖</div>
+              <div class="title">LiteLLM Gateway</div>
+              <div class="desc">
+                • Model proxy (4 verified models)<br>
+                • OpenAI-compatible API<br>
+                • Token usage reporting
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <h2>Layer Responsibilities</h2>
+
+        <div class="component-grid">
+          <div class="component-card infra">
+            <div class="card-header">
+              <div class="file-name">.NET Presentation Layer</div>
+              <span class="badge">Frontend</span>
+            </div>
+            <div class="card-desc">
+              <strong>Responsibilities:</strong>
+              <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
+                <li>Serves UI (index.html)</li>
+                <li>Manages session cookies</li>
+                <li>Proxies all data requests to Python</li>
+                <li>Resolves Windows username (X-User header)</li>
+                <li>No analytical logic</li>
+              </ul>
+              <strong>Location:</strong> <code>dotnet-app/</code>
+            </div>
+          </div>
+
+          <div class="component-card infra">
+            <div class="card-header">
+              <div class="file-name">Python Application Layer</div>
+              <span class="badge">Backend</span>
+            </div>
+            <div class="card-desc">
+              <strong>Responsibilities:</strong>
+              <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
+                <li>REST API endpoints (Flask)</li>
+                <li>Session management (in-RAM)</li>
+                <li>File upload processing</li>
+                <li>Two-call AI pipeline orchestration</li>
+                <li>Usage tracking + cost calculation</li>
+              </ul>
+              <strong>Location:</strong> <code>python-service/app.py</code>
+            </div>
+          </div>
+
+          <div class="component-card core">
+            <div class="card-header">
+              <div class="file-name">Analytical Core</div>
+              <span class="badge">Protected</span>
+            </div>
+            <div class="card-desc">
+              <strong>Responsibilities:</strong>
+              <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
+                <li>LLM communication (two-call pipeline)</li>
+                <li>Pandas code execution (isolated namespace)</li>
+                <li>File reading + schema extraction</li>
+                <li>Prompt engineering (system prompts)</li>
+                <li>Result parsing + validation</li>
+              </ul>
+              <strong>Status:</strong> Read-only in production
+            </div>
+          </div>
+
+          <div class="component-card security">
+            <div class="card-header">
+              <div class="file-name">Security Layer</div>
+              <span class="badge">Security</span>
+            </div>
+            <div class="card-desc">
+              <strong>Responsibilities:</strong>
+              <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
+                <li>API key encryption (Fernet)</li>
+                <li>Per-user authentication</li>
+                <li>Admin authorization checks</li>
+                <li>Optional internal API secret</li>
+                <li>Access control (Data Experts)</li>
+              </ul>
+              <strong>Location:</strong> <code>services/crypto.py</code>, <code>services/admin_auth.py</code>
+            </div>
+          </div>
+        </div>
+
+        <h2>State Management</h2>
+
+        <div class="info-box">
+          <h3>In-RAM Session Storage</h3>
+          <p>All user session data resides in Python process memory (STORAGE_BACKEND=memory). Keyed by X-Session-Id from .NET session cookie.</p>
+          <h4>What's Stored Per Session:</h4>
+          <ul>
+            <li>Uploaded DataFrames (standard/variance modes)</li>
+            <li>Schema information (column names, types, samples)</li>
+            <li>Chat history (per mode, for conversational context)</li>
+            <li>Last query result (for Excel export + refine feature)</li>
+            <li>User model preference (session-scoped override)</li>
+            <li>File labels and metadata</li>
+          </ul>
+          <p><strong>Trade-off:</strong> Fast (no disk/DB I/O) but volatile (restart clears all). For persistent storage, use the SQL Server backend variant.</p>
+        </div>
+
+        <h2>Request Context (Thread-Safe State)</h2>
+
+        <div class="key-point">
+          <div class="kp-title">
+            <span class="kp-icon">🧵</span>
+            Python contextvars for Per-Request State
+          </div>
+          <div class="kp-desc">
+            Single Python process serves multiple users via threads. Each request gets isolated context using Python's contextvars:
+            <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
+              <li><code>request_context.user_api_key</code> — User's decrypted LiteLLM key</li>
+              <li><code>request_context.active_model</code> — User's model preference or admin default</li>
+              <li><code>request_context.usage_records</code> — Token counts for this request</li>
+            </ul>
+            Config.py uses <code>@property</code> decorators to read from context dynamically. The analytical core (llm.py) calls Config.LITELLM_API_KEY and Config.LLM_MODEL—unchanged—while config.py serves per-request values.
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: Core Components -->
+      <div class="tab-content">
+        <h2>Core Components (Analytical Engine)</h2>
+        <p>These files implement the proven analytical logic. They are <strong>production-frozen</strong> and never modified.</p>
+
+        <div class="component-grid">
+          <div class="component-card core">
+            <div class="card-header">
+              <div class="file-name">services/llm.py</div>
+              <span class="badge">Core</span>
+            </div>
+            <div class="card-desc">
+              <strong>The Two-Call LLM Pipeline:</strong><br><br>
+              <code>generate_query_code(messages, temp=0)</code><br>
+              Call 1: Send schema + question → LLM generates pandas code<br><br>
+              <code>generate_human_answer(messages, temp=0.3)</code><br>
+              Call 2: Send result + metadata → LLM generates answer + chart spec<br><br>
+              <code>parse_answer_response(raw)</code><br>
+              Extracts JSON from response (handles GPT prefixes, markdown fences)<br><br>
+              <strong>Enhancements:</strong> Force JSON mode for GPT models, enhanced prefix stripping
+            </div>
+          </div>
+
+          <div class="component-card core">
+            <div class="card-header">
+              <div class="file-name">services/executor.py</div>
+              <span class="badge">Core</span>
+            </div>
+            <div class="card-desc">
+              <strong>Secure Code Execution:</strong><br><br>
+              Executes LLM-generated pandas code in an isolated namespace. Pre-loads DataFrame as <code>df</code>.
+              Imports pandas (<code>pd</code>), numpy (<code>np</code>) available on demand. Returns result + metadata
+              (type, shape, column names). Captures execution errors for retry logic.<br><br>
+              <strong>Namespace isolation per mode:</strong> Standard and Variance have separate execution contexts.
+            </div>
+          </div>
+
+          <div class="component-card core">
+            <div class="card-header">
+              <div class="file-name">services/file_handler.py</div>
+              <span class="badge">Core</span>
+            </div>
+            <div class="card-desc">
+              <strong>Data Ingestion:</strong><br><br>
+              Reads CSV/Excel files with auto-encoding detection (UTF-8, UTF-8-sig, Latin-1). Multi-sheet Excel support.
+              Generates schema information for LLM context (column names, types, sample values). Type inference
+              (numeric, date, categorical).<br><br>
+              <strong>Function:</strong> <code>read_file(file_bytes, filename, sheet_name=None)</code>
+            </div>
+          </div>
+
+          <div class="component-card core">
+            <div class="card-header">
+              <div class="file-name">prompts/standard.py</div>
+              <span class="badge">Core</span>
+            </div>
+            <div class="card-desc">
+              <strong>System Prompts for Standard Mode:</strong><br><br>
+              <code>build_code_gen_prompt()</code> — Code generation rules and constraints<br>
+              <code>build_answer_gen_prompt()</code> — Answer formatting and chart spec rules<br><br>
+              <strong>Key Rules:</strong> No estimation, row count clarity, planning guidance, data cleaning, ML best practices
+            </div>
+          </div>
+
+          <div class="component-card core">
+            <div class="card-header">
+              <div class="file-name">prompts/variance.py</div>
+              <span class="badge">Core</span>
+            </div>
+            <div class="card-desc">
+              <strong>System Prompts for Variance Mode:</strong><br><br>
+              Same structure as standard.py. Handles two DataFrames (baseline vs current).
+              Variance-specific calculations and comparisons. Date labeling from filenames.
+            </div>
+          </div>
+        </div>
+
+        <h2>Prompt Engineering Safeguards</h2>
+
+        <div class="key-point">
+          <div class="kp-title">
+            <span class="kp-icon">🧮</span>
+            Zero Estimation Rule
+          </div>
+          <div class="kp-desc">
+            <strong>Critical instruction in system prompt:</strong> "All numbers in your answer must come DIRECTLY from the data result or metadata.
+            Never calculate, count, sum, estimate, or derive any numbers yourself. Even if the user asks for 'insights,' ALL numbers must come from the data—no speculation."
+            This ensures every numerical result is computed by executed pandas code, not AI estimation.
+          </div>
+        </div>
+
+        <div class="key-point">
+          <div class="kp-title">
+            <span class="kp-icon">📏</span>
+            Row Count Clarity
+          </div>
+          <div class="kp-desc">
+            <strong>Prevents off-by-one errors:</strong> "The CSV header row is NOT in the DataFrame—it's been converted to column names.
+            df.shape[0] and len(df) return ONLY data rows. Do NOT add +1 or -1. If CSV has 1 header + 100 data rows, then len(df) = 100 (correct answer)."
+          </div>
+        </div>
+
+        <div class="key-point">
+          <div class="kp-title">
+            <span class="kp-icon">📐</span>
+            Planning Guidance
+          </div>
+          <div class="kp-desc">
+            <strong>For complex queries:</strong> "Plan your approach before coding. Break into 2-3 clear intermediate steps with descriptive variable names.
+            Aim for code under 100 lines. Ensure all string literals, parentheses, and brackets are properly closed." Reduces syntax errors in generated code.
+          </div>
+        </div>
+
+        <div class="key-point">
+          <div class="kp-title">
+            <span class="kp-icon">🧹</span>
+            Data Cleaning Rules
+          </div>
+          <div class="kp-desc">
+            <strong>Always apply before modeling:</strong> Convert dates with pd.to_datetime(..., errors='coerce'). Convert Categorical columns to string.
+            Strip currency symbols. Use pd.to_numeric(..., errors='coerce'). Drop or fill NaN values before ML model fitting.
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: Infrastructure -->
+      <div class="tab-content">
+        <h2>Infrastructure Components</h2>
+        <p>The "harness" around the analytical core—adds enterprise capabilities without modifying core files.</p>
+
+        <div class="component-grid">
+          <div class="component-card infra">
+            <div class="card-header">
+              <div class="file-name">services/request_context.py</div>
+              <span class="badge">Infrastructure</span>
+            </div>
+            <div class="card-desc">
+              <strong>Thread-Safe Per-Request State:</strong><br><br>
+              Uses Python's contextvars for isolated per-request context:<br>
+              • <code>user_api_key</code> — ContextVar[str]<br>
+              • <code>active_model</code> — ContextVar[str]<br>
+              • <code>usage_records</code> — ContextVar[list]<br><br>
+              <code>begin(key, model)</code> → Sets context, returns token<br>
+              <code>end(token)</code> → Clears context<br>
+              <code>record(usage)</code> → Appends token data<br>
+              <code>get_records()</code> → Returns list for database flush
+            </div>
+          </div>
+
+          <div class="component-card infra">
+            <div class="card-header">
+              <div class="file-name">services/usage_capture.py</div>
+              <span class="badge">Infrastructure</span>
+            </div>
+            <div class="card-desc">
+              <strong>Usage Tracking via Proxy Pattern:</strong><br><br>
+              <code>install()</code> — Swaps llm.requests with capturing proxy<br>
+              Proxy intercepts LLM responses, extracts token counts, stores in request_context<br>
+              <code>flush(user, session, request_id, mode, question)</code> — Writes to database<br><br>
+              <strong>Key Innovation:</strong> llm.py file remains byte-identical. It calls requests.post() as before,
+              but the reference points to our proxy instead of the real library.
+            </div>
+          </div>
+
+          <div class="component-card infra">
+            <div class="card-header">
+              <div class="file-name">services/database.py</div>
+              <span class="badge">Infrastructure</span>
+            </div>
+            <div class="card-desc">
+              <strong>SQLite Persistence (chatdata.db):</strong><br><br>
+              • <strong>Users:</strong> Encrypted API keys, login timestamps<br>
+              • <strong>UsageLog:</strong> Per-request tokens/cost (RequestID = one per question)<br>
+              • <strong>ModelConfig:</strong> Admin default model + change log<br>
+              • <strong>DataExperts:</strong> Admin-published datasets with access control<br><br>
+              <strong>Design:</strong> WAL journal mode (safe concurrent reads/writes), UTC timestamps,
+              RequestID for question counting (survives retries)
+            </div>
+          </div>
+
+          <div class="component-card infra">
+            <div class="card-header">
+              <div class="file-name">services/pricing.py</div>
+              <span class="badge">Infrastructure</span>
+            </div>
+            <div class="card-desc">
+              <strong>Model Pricing for Cost Calculation:</strong><br><br>
+              Hardcoded USD per 1M tokens (input/output):<br>
+              • claude-sonnet-4-5: $3 / $15<br>
+              • gpt-5.4: $2.50 / $15<br>
+              • gpt-4o: $2.50 / $10<br>
+              • gpt-5.1: $2 / $10<br><br>
+              Falls back to DEFAULT_PRICING for unknown models. Keep in sync with gateway billing.
+            </div>
+          </div>
+
+          <div class="component-card infra">
+            <div class="card-header">
+              <div class="file-name">services/data_manager.py</div>
+              <span class="badge">Infrastructure</span>
+            </div>
+            <div class="card-desc">
+              <strong>In-RAM Session Storage:</strong><br><br>
+              <code>SessionData</code> class holds all per-user state:<br>
+              • DataFrames (standard: df, variance: df_a/df_b)<br>
+              • Schema information<br>
+              • Chat history (per mode)<br>
+              • Last result (for export + refine)<br>
+              • User model preference<br><br>
+              <code>get_session(sid)</code>, <code>save_session(sid, sess)</code>
+            </div>
+          </div>
+
+          <div class="component-card infra">
+            <div class="card-header">
+              <div class="file-name">config.py</div>
+              <span class="badge">Infrastructure</span>
+            </div>
+            <div class="card-desc">
+              <strong>Dynamic Configuration:</strong><br><br>
+              Environment variables + dynamic properties:<br><br>
+              <code>@property LITELLM_API_KEY</code> → reads from request_context or _ENV_LITELLM_API_KEY<br>
+              <code>@property LLM_MODEL</code> → reads from request_context or _ENV_LLM_MODEL<br><br>
+              Called by llm.py—which remains unchanged. Config.py handles the per-request routing.
+            </div>
+          </div>
+
+          <div class="component-card infra">
+            <div class="card-header">
+              <div class="file-name">services/insights.py</div>
+              <span class="badge">Infrastructure</span>
+            </div>
+            <div class="card-desc">
+              <strong>Upload Insights (Pure Pandas, Zero LLM):</strong><br><br>
+              • Starter question chips (based on data types)<br>
+              • Data profile card (rows, columns, types, memory)<br>
+              • Anomaly detection ("Did you notice?" nudges)<br><br>
+              All computed locally in pandas—no LLM calls. Displayed on upload success.
+            </div>
+          </div>
+
+          <div class="component-card infra">
+            <div class="card-header">
+              <div class="file-name">services/report_export.py</div>
+              <span class="badge">Infrastructure</span>
+            </div>
+            <div class="card-desc">
+              <strong>Word Report Export:</strong><br><br>
+              <code>build_conversation_docx()</code> — Exports conversation to Word:<br>
+              • Questions + answers<br>
+              • Chart PNGs (captured from Canvas)<br>
+              • Optional Query & Calculations appendix<br>
+              • GA logo branding<br><br>
+              Uses python-docx library. Replaces saved history feature (user preference).
+            </div>
+          </div>
+        </div>
+
+        <h2>Database Schema</h2>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Table</th>
+                <th>Purpose</th>
+                <th>Key Columns</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Users</strong></td>
+                <td>Per-user API keys (Fernet encrypted)</td>
+                <td>UserID, Username, APIKey, CreatedAt, LastLogin, IsActive</td>
+              </tr>
+              <tr>
+                <td><strong>UsageLog</strong></td>
+                <td>Token-level usage tracking per request</td>
+                <td>LogID, UserID, SessionID, RequestID, Timestamp, Mode, QuestionText, CallType, Model, PromptTokens, CompletionTokens, TotalCost, Success</td>
+              </tr>
+              <tr>
+                <td><strong>ModelConfig</strong></td>
+                <td>Admin default model (one active)</td>
+                <td>ConfigID, ModelName, IsActive, SetBy, SetAt, InputPrice, OutputPrice</td>
+              </tr>
+              <tr>
+                <td><strong>ModelChangeLog</strong></td>
+                <td>Audit trail for model changes</td>
+                <td>ChangeID, PreviousModel, NewModel, ChangedBy, ChangedAt, Reason</td>
+              </tr>
+              <tr>
+                <td><strong>DataExperts</strong></td>
+                <td>Admin-published datasets</td>
+                <td>ExpertID, Label, Description, FilePath, AccessMode, AllowedUsers, AllowedGroups, RecommendedQuestions, SourceType, SourceConfig, SqlQuery, IsActive</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2>Security Components</h2>
+
+        <div class="component-grid">
+          <div class="component-card security">
+            <div class="card-header">
+              <div class="file-name">services/crypto.py</div>
+              <span class="badge">Security</span>
+            </div>
+            <div class="card-desc">
+              <strong>Fernet Encryption for API Keys:</strong><br><br>
+              <code>encrypt_api_key(plain)</code> → Fernet encrypted bytes<br>
+              <code>decrypt_api_key(encrypted)</code> → Plain text key<br>
+              <code>mask_api_key(plain)</code> → "sk-...abc123" for UI display<br><br>
+              Requires <code>ENCRYPTION_KEY</code> in .env (Fernet key). Keys stored encrypted in Users table.
+            </div>
+          </div>
+
+          <div class="component-card security">
+            <div class="card-header">
+              <div class="file-name">services/admin_auth.py</div>
+              <span class="badge">Security</span>
+            </div>
+            <div class="card-desc">
+              <strong>Admin Authorization:</strong><br><br>
+              <code>is_admin(username)</code> → Checks against ADMIN_USERS env var (comma-separated)<br>
+              <code>@require_admin</code> → Decorator for admin-only endpoints (returns 403 if not admin)<br><br>
+              Used for: model selection, user management, usage analytics, Data Experts management
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: Request Pipeline -->
+      <div class="tab-content">
+        <h2>Complete Request Pipeline</h2>
+        <p>Step-by-step flow from user question to final answer.</p>
+
+        <div class="pipeline-sequence">
+          <div class="pipeline-step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <div class="step-title">User Submits Question</div>
+              <div class="step-desc">
+                Browser sends POST to .NET <code>/ask</code> endpoint with question text and mode (standard/variance).
+                .NET resolves session cookie (<code>cwd_sid</code>), extracts Windows username (if auth enabled).
+              </div>
+              <div class="step-file">dotnet-app/Program.cs → ProxyJson()</div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <div class="step-title">.NET Proxies to Python</div>
+              <div class="step-desc">
+                .NET forwards request to Python <code>/api/ask</code> with headers:<br>
+                • <code>X-Session-Id</code> — Session identifier<br>
+                • <code>X-User</code> — Windows username or dev fallback<br>
+                • <code>X-Internal-Auth</code> — Optional shared secret (if configured)
+              </div>
+              <div class="step-file">dotnet-app/Program.cs</div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <div class="step-title">Authentication Envelope</div>
+              <div class="step-desc">
+                <code>_resolve_user_context(username, session)</code>:<br>
+                1. Look up user in database by username<br>
+                2. Decrypt their API key (Fernet)<br>
+                3. Check session for user's model preference → fall back to admin default<br>
+                4. Returns (user, api_key, model_name) or error response<br><br>
+                <code>request_context.begin(api_key, model_name)</code> → Sets thread-local context for this request
+              </div>
+              <div class="step-file">app.py (_resolve_user_context), services/request_context.py</div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">4</div>
+            <div class="step-content">
+              <div class="step-title">Load Session Data</div>
+              <div class="step-desc">
+                Retrieve session from in-RAM storage using X-Session-Id:<br>
+                • Uploaded DataFrame(s)<br>
+                • Schema information<br>
+                • Chat history (for conversational context)<br>
+                • Last result (if exists)
+              </div>
+              <div class="step-file">services/data_manager.py (get_session)</div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">5</div>
+            <div class="step-content">
+              <div class="step-title">Call 1: Generate Pandas Code</div>
+              <div class="step-desc">
+                Build messages: system prompt + schema + question + history (last Q&A pair)<br>
+                <code>llm.generate_query_code(messages, temp=0)</code><br>
+                LLM generates Python code that queries the DataFrame. Deterministic (temp=0).<br>
+                Code stored in debug log.
+              </div>
+              <div class="step-file">services/llm.py, prompts/standard.py</div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">6</div>
+            <div class="step-content">
+              <div class="step-title">Execute Generated Code</div>
+              <div class="step-desc">
+                <code>executor.execute_generated_code(code, df=df)</code><br>
+                Runs code in isolated namespace. DataFrame pre-loaded as <code>df</code>.<br>
+                Returns: (success, result_str, raw_result, metadata)<br>
+                Metadata includes: type (DataFrame/Series/scalar/list), rows, columns, column names
+              </div>
+              <div class="step-file">services/executor.py</div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">7</div>
+            <div class="step-content">
+              <div class="step-title">Auto-Retry on Execution Failure</div>
+              <div class="step-desc">
+                If execution fails:<br>
+                1. Inject error message into prompt: "Your code failed with: [error]. Return ONLY fixed code."<br>
+                2. Call 1 again (retry)<br>
+                3. Execute retry code<br>
+                4. If retry fails → return error to user (no infinite loop)<br>
+                5. If retry succeeds → continue to Call 2
+              </div>
+              <div class="step-file">app.py (_run_pipeline)</div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">8</div>
+            <div class="step-content">
+              <div class="step-title">Call 2: Generate Human Answer</div>
+              <div class="step-desc">
+                Build messages: system prompt + question + result_str + metadata<br>
+                <code>llm.generate_human_answer(messages, temp=0.3, force_json=True)</code><br>
+                LLM generates JSON: <code>{"answer": "...", "chart": {...}}</code><br>
+                More creative (temp=0.3). Force JSON mode for GPT models.
+              </div>
+              <div class="step-file">services/llm.py, prompts/standard.py</div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">9</div>
+            <div class="step-content">
+              <div class="step-title">Parse JSON Response</div>
+              <div class="step-desc">
+                <code>llm.parse_answer_response(raw)</code><br>
+                Enhanced parsing: strips GPT prefixes ("Here's the answer:"), removes markdown fences,
+                finds first { and last }, extracts clean JSON.<br>
+                Returns: (answer_text, chart_spec) or (raw, None) if parsing fails
+              </div>
+              <div class="step-file">services/llm.py</div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">10</div>
+            <div class="step-content">
+              <div class="step-title">Update Session + Usage Tracking</div>
+              <div class="step-desc">
+                Store in session:<br>
+                • Last result (for Excel export)<br>
+                • Last question + metadata (for refine feature)<br>
+                • Append Q&A to history (for next question's context)<br><br>
+                Usage tracking (via proxy):<br>
+                • <code>usage_capture.flush()</code> writes token counts to database<br>
+                • Calculates cost using model-specific pricing<br>
+                • Logs: UserID, SessionID, RequestID, tokens, cost, call type, success
+              </div>
+              <div class="step-file">services/data_manager.py, services/usage_capture.py, services/database.py</div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">11</div>
+            <div class="step-content">
+              <div class="step-title">Return Response</div>
+              <div class="step-desc">
+                Python returns JSON to .NET:<br>
+                <code>{"answer": "...", "chart": {...}, "debug": [...]}</code><br><br>
+                .NET relays to browser. Browser displays answer, renders chart (Chart.js),
+                adds to transcript, enables actions (refine, export, copy).
+              </div>
+              <div class="step-file">app.py → dotnet-app/Program.cs → index.html</div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">12</div>
+            <div class="step-content">
+              <div class="step-title">Cleanup Request Context</div>
+              <div class="step-desc">
+                <code>request_context.end(ctx_tokens)</code> → Clears thread-local context<br>
+                Next request will set its own isolated context (different user, different key/model).
+              </div>
+              <div class="step-file">services/request_context.py</div>
+            </div>
+          </div>
+        </div>
+
+        <h2>Optional: Refine Feature (One Sentence / More Detail)</h2>
+
+        <div class="info-box">
+          <h3>Re-Run Call 2 on Stored Result</h3>
+          <p>Enabled on the latest answer only. User clicks "One Sentence" or "More Detail":</p>
+          <ul>
+            <li>Retrieves last question, result_str, metadata from session</li>
+            <li>Modifies question: "Re-explain the result in ONE sentence" or "...in MORE detail"</li>
+            <li>Skips Call 1 + execution entirely — numbers cannot change</li>
+            <li>Runs ONLY Call 2 with modified prompt</li>
+            <li>Returns new answer text (chart spec unchanged)</li>
+            <li>Logs as <code>call_type: refine_answer</code> in UsageLog</li>
+          </ul>
+          <p><strong>Endpoint:</strong> <code>POST /api/ask/refine</code> with <code>{"style": "brief" | "detail"}</code></p>
+        </div>
+      </div>
+
+      <!-- TAB 5: Security & Auth -->
+      <div class="tab-content">
+        <h2>Security & Authentication</h2>
+
+        <h3>Identity Resolution</h3>
+
+        <div class="key-point">
+          <div class="kp-title">
+            <span class="kp-icon">👤</span>
+            X-User Header from .NET
+          </div>
+          <div class="kp-desc">
+            Identity supplied by .NET in <code>X-User</code> header:<br>
+            • When Windows Authentication is ON → Windows username from badge<br>
+            • When OFF → <code>Auth:DevUsername</code> from appsettings or machine username<br><br>
+            <strong>No separate login system.</strong> The app relies on infrastructure authentication (Windows Auth or dev override).
+          </div>
+        </div>
+
+        <h3>Per-User API Keys</h3>
+
+        <div class="pipeline-sequence">
+          <div class="pipeline-step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <div class="step-title">Onboarding: Key Entry</div>
+              <div class="step-desc">
+                On first visit, user sees blocking modal: "Enter your LiteLLM API key".<br>
+                Key format validated (starts with "sk-" or similar). User enters key once.
+              </div>
+              <div class="step-file">index.html (onboarding modal)</div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <div class="step-title">Encryption + Storage</div>
+              <div class="step-desc">
+                <code>POST /api/user/save_key</code><br>
+                Backend encrypts key using Fernet (symmetric encryption):<br>
+                <code>crypto.encrypt_api_key(plain_key)</code> → encrypted bytes<br>
+                Stores in Users table: <code>INSERT INTO Users (Username, APIKey, CreatedAt)</code><br>
+                Key never stored in plain text.
+              </div>
+              <div class="step-file">app.py, services/crypto.py, services/database.py</div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <div class="step-title">Per-Request Decryption</div>
+              <div class="step-desc">
+                On every <code>/api/ask</code> request:<br>
+                1. Look up user by username: <code>db.get_user_by_username(username)</code><br>
+                2. Decrypt key: <code>crypto.decrypt_api_key(user["APIKey"])</code><br>
+                3. Set in request context: <code>request_context.user_api_key.set(decrypted_key)</code><br>
+                4. Config.py serves it to llm.py via <code>@property LITELLM_API_KEY</code>
+              </div>
+              <div class="step-file">app.py (_resolve_user_context)</div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">4</div>
+            <div class="step-content">
+              <div class="step-title">LLM Gateway Call</div>
+              <div class="step-desc">
+                llm.py calls <code>requests.post(url, headers={"Authorization": f"Bearer {Config.LITELLM_API_KEY}"})</code><br>
+                Config.LITELLM_API_KEY dynamically returns the current request's user key.<br>
+                Gateway validates key, processes request, returns response + token usage.
+              </div>
+              <div class="step-file">services/llm.py, config.py</div>
+            </div>
+          </div>
+        </div>
+
+        <h3>Admin Authorization</h3>
+
+        <div class="info-box">
+          <h3>ADMIN_USERS Environment Variable</h3>
+          <p>Comma-separated list of usernames with admin privileges. Example: <code>ADMIN_USERS=alice,bob,charlie</code></p>
+          <h4>Admin-Only Endpoints:</h4>
+          <ul>
+            <li><code>GET /api/admin/check</code> — Check if current user is admin</li>
+            <li><code>GET /api/admin/users/list</code> — List all users (username, last login, created date)</li>
+            <li><code>GET /api/admin/usage/summary</code> — Aggregated usage across all users</li>
+            <li><code>GET /api/admin/usage/by_user</code> — Top users by cost</li>
+            <li><code>GET /api/admin/usage/by_model</code> — Usage breakdown by AI model</li>
+            <li><code>GET /api/admin/models/current</code> — Current global default model</li>
+            <li><code>POST /api/admin/models/select</code> — Change global default model</li>
+            <li><code>GET /api/admin/models/available</code> — List available models from gateway</li>
+            <li><code>GET /api/admin/experts/list</code> — List all Data Experts</li>
+            <li><code>POST /api/admin/experts/create</code> — Create new Data Expert</li>
+            <li><code>POST /api/admin/experts/update</code> — Update existing Data Expert</li>
+          </ul>
+          <p><strong>Enforcement:</strong> <code>@require_admin</code> decorator on endpoints → returns 403 if not admin</p>
+        </div>
+
+        <h3>Optional: Internal API Secret</h3>
+
+        <div class="info-box warning">
+          <h3>X-Internal-Auth Header</h3>
+          <p>Optional shared secret between .NET and Python. Configure when Python runs on a different machine than .NET.</p>
+          <h4>Why It's Needed:</h4>
+          <ul>
+            <li>Without it: Anyone on the network can hit port 8000 and claim any X-User (spoofable)</li>
+            <li>With it: .NET sends <code>X-Internal-Auth: [secret]</code> on every request. Python validates match.</li>
+          </ul>
+          <h4>Configuration:</h4>
+          <ul>
+            <li>Python: <code>INTERNAL_API_SECRET=some-random-secret</code> in .env</li>
+            <li>.NET: <code>PythonService:InternalSecret=some-random-secret</code> in appsettings.json</li>
+          </ul>
+          <p><strong>Check:</strong> <code>app.py @api.before_request _check_internal_secret()</code> → 401 if mismatch</p>
+        </div>
+
+        <h3>Data Experts Access Control</h3>
+
+        <div class="key-point">
+          <div class="kp-title">
+            <span class="kp-icon">🔐</span>
+            Public vs Restricted Access
+          </div>
+          <div class="kp-desc">
+            Admin publishes datasets with access control:<br><br>
+            <strong>Public:</strong> AccessMode = "public" → All users can see/load<br>
+            <strong>Restricted (Users):</strong> AccessMode = "restricted", AllowedUsers = "alice,bob" → Only listed users<br>
+            <strong>Restricted (Groups):</strong> AccessMode = "restricted", AllowedGroups = "Finance,HR" → Users in these AD groups<br><br>
+            <strong>Enforcement:</strong> Python checks on <code>/api/experts/list</code> and <code>/api/experts/load</code><br>
+            Groups resolved by .NET from Windows badge, sent in <code>X-User-Groups</code> header (comma-separated)
+          </div>
+        </div>
+
+        <h3>Live Data Sources (Azure + SQL Server)</h3>
+
+        <div class="info-box">
+          <h3>Query-Backed Experts Security</h3>
+          <p>Data Experts can be backed by live data sources instead of static files:</p>
+          <h4>Azure Blob Storage:</h4>
+          <ul>
+            <li>App's Entra service principal (AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET)</li>
+            <li>Downloads parquet/csv/xlsx on demand</li>
+            <li>Admin's SQL runs locally in DuckDB (blobs as tables)</li>
+            <li>Guard: DATASOURCE_MAX_ROWS (default 500k)</li>
+          </ul>
+          <h4>SQL Server / Azure SQL:</h4>
+          <ul>
+            <li><strong>Windows Auth:</strong> Service's own identity (gMSA, no stored password) — recommended for on-prem</li>
+            <li><strong>SQL Login:</strong> Username + password (Fernet encrypted) — for Azure SQL</li>
+            <li>Database runs the SQL query (not DuckDB)</li>
+            <li>Guard: DATASOURCE_MAX_ROWS + 50 MB working cap</li>
+          </ul>
+          <p><strong>Lazy imports:</strong> duckdb, azure-storage-blob, pyodbc only imported when needed. Service runs without them (file mode).</p>
+        </div>
+      </div>
+
+      <!-- TAB 6: Deployment -->
+      <div class="tab-content">
+        <h2>Deployment Architecture</h2>
+
+        <h3>Local Development</h3>
+
+        <div class="feature-list">
+          <h4>Quick Start Scripts</h4>
+          <ul>
+            <li><strong>macOS/Linux:</strong> <code>./run.sh</code></li>
+            <li><strong>Windows:</strong> <code>.\run.ps1</code></li>
+          </ul>
+        </div>
+
+        <div class="pipeline-sequence">
+          <div class="pipeline-step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <div class="step-title">Start Python Backend</div>
+              <div class="step-desc">
+                <code>cd python-service && python app.py</code><br>
+                Flask development server, port 8000, auto-reload on file changes
+              </div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <div class="step-title">Start .NET Frontend</div>
+              <div class="step-desc">
+                <code>cd dotnet-app && dotnet run -c Release</code><br>
+                ASP.NET Core Kestrel server, port 5080, serves UI + proxies to Python
+              </div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <div class="step-title">Open Browser</div>
+              <div class="step-desc">
+                Navigate to <code>http://localhost:5080</code><br>
+                Ready to upload data and ask questions
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <h3>Production (Single Server)</h3>
+
+        <div class="architecture-flow">
+          <h3 style="color: var(--ga-navy); margin-top: 0;">Production Topology</h3>
+          <div class="flow-row">
+            <div class="flow-box">
+              <div class="icon">🖥️</div>
+              <div class="title">Windows Server</div>
+              <div class="desc">
+                IIS hosts .NET (port 80/443)<br>
+                Python as background service (port 8000)<br>
+                SQLite database (chatdata.db)<br>
+                Optional: datasets folder (Data Experts)
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pipeline-sequence">
+          <div class="pipeline-step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <div class="step-title">Install Python Dependencies</div>
+              <div class="step-desc">
+                <code>cd python-service</code><br>
+                <code>python -m venv .venv</code> (optional but recommended)<br>
+                <code>pip install -r requirements.txt</code><br><br>
+                <strong>Core dependencies:</strong> Flask, pandas, numpy, requests, waitress, python-docx, cryptography<br>
+                <strong>Optional (for live sources):</strong> duckdb, azure-storage-blob, pyodbc
+              </div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <div class="step-title">Configure Environment (.env)</div>
+              <div class="step-desc">
+                Create <code>python-service/.env</code> with production values:<br>
+                <code>LITELLM_API_BASE=https://aigateway.ga.com</code><br>
+                <code>LITELLM_API_KEY=sk-...</code> (fallback key)<br>
+                <code>LLM_MODEL=gpt-5.4</code> (fallback model)<br>
+                <code>ENCRYPTION_KEY=[generate with cryptography.fernet.Fernet.generate_key()]</code><br>
+                <code>ADMIN_USERS=alice,bob,charlie</code><br>
+                <code>INTERNAL_API_SECRET=[random secret]</code> (optional)<br><br>
+                <strong>Azure (if using live sources):</strong><br>
+                <code>AZURE_TENANT_ID=...</code><br>
+                <code>AZURE_CLIENT_ID=...</code><br>
+                <code>AZURE_CLIENT_SECRET=...</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <div class="step-title">Run Python as Windows Service</div>
+              <div class="step-desc">
+                <code>python serve.py</code> — Waitress WSGI server<br>
+                • ONE process (critical constraint)<br>
+                • WAITRESS_THREADS (default 16, configurable)<br>
+                • Binds 127.0.0.1:8000 (localhost only)<br>
+                • Production-ready, no auto-reload<br><br>
+                <strong>Windows Service (recommended):</strong><br>
+                Use NSSM (Non-Sucking Service Manager) to register serve.py as a Windows service:<br>
+                <code>nssm install ChatWithDataAPI "C:\path\to\python.exe" "C:\path\to\serve.py"</code><br>
+                Auto-starts on boot, restarts on failure
+              </div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">4</div>
+            <div class="step-content">
+              <div class="step-title">Deploy .NET to IIS</div>
+              <div class="step-desc">
+                <strong>Publish:</strong><br>
+                <code>cd dotnet-app</code><br>
+                <code>dotnet publish -c Release -o ./publish</code><br><br>
+                <strong>IIS Configuration:</strong><br>
+                • Create new site or application<br>
+                • Point to ./publish folder<br>
+                • Application pool: .NET CLR version: No Managed Code<br>
+                • Set <code>PythonService:BaseUrl=http://localhost:8000</code> in appsettings.Production.json<br>
+                • Enable Windows Authentication (optional)<br>
+                • Binds to port 80/443 (with SSL certificate)
+              </div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">5</div>
+            <div class="step-content">
+              <div class="step-title">Database Initialization</div>
+              <div class="step-desc">
+                On first run, Python automatically creates <code>chatdata.db</code> in python-service folder.<br>
+                Tables created: Users, UsageLog, ModelConfig, ModelChangeLog, DataExperts<br>
+                Default model config seeded from LLM_MODEL env var.<br><br>
+                <strong>Location:</strong> <code>python-service/chatdata.db</code> (gitignored, never commit)<br>
+                <strong>Backup:</strong> Regularly copy chatdata.db (usage data, keys, experts)
+              </div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">6</div>
+            <div class="step-content">
+              <div class="step-title">Verify Deployment</div>
+              <div class="step-desc">
+                • Browse to server URL (e.g., http://servername)<br>
+                • Should see Chat with Data UI<br>
+                • Enter API key (onboarding modal)<br>
+                • Upload sample file, ask a question<br>
+                • Check Python logs: <code>python-service/logs/app.log</code><br>
+                • Check database: <code>python-service/chatdata.db</code> (UsageLog should have entries)
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <h2>Sizing & Capacity</h2>
+
+        <div class="info-box">
+          <h3>Single-Server Capacity Planning</h3>
+          <p>Workload is I/O-bound (each query waits on LLM). Threads handle concurrency efficiently.</p>
+          <h4>Resource Drivers:</h4>
+          <ul>
+            <li><strong>RAM:</strong> Primary constraint. Each active user's data sits in memory. With files up to ~50 MB, budget a few hundred MB per concurrent active user + OS overhead.</li>
+            <li><strong>CPU:</strong> Light (4 vCPUs sufficient for small-to-medium load). Pandas operations + JSON parsing.</li>
+            <li><strong>Network:</strong> Outbound to LiteLLM gateway. Typical request: 10-50 KB prompt, 1-5 KB response.</li>
+          </ul>
+          <h4>Recommended Specs (Pilot Scale):</h4>
+          <ul>
+            <li><strong>Small (10-20 users):</strong> 4 vCPUs, 16 GB RAM</li>
+            <li><strong>Medium (20-50 users):</strong> 8 vCPUs, 32 GB RAM</li>
+            <li><strong>Large (50+ users):</strong> Scale up (bigger server) or switch to SQL Server backend variant</li>
+          </ul>
+          <p><strong>Threading:</strong> WAITRESS_THREADS=16 (default). Increase if seeing queue delays (check logs). Don't exceed 2× CPU core count.</p>
+        </div>
+
+        <h2>Deployment Constraints</h2>
+
+        <div class="info-box warning">
+          <h3>Critical Constraints for Production</h3>
+          <ul>
+            <li><strong>ONE Python process only:</strong> Never run multiple workers (gunicorn --workers > 1) or multiple instances. In-RAM sessions would split. Use threads for concurrency.</li>
+            <li><strong>Restart clears data:</strong> All sessions, uploaded DataFrames, chat history cleared on restart. Users must re-upload. Acceptable for pilot scale.</li>
+            <li><strong>No load balancing:</strong> Can't put multiple instances behind a load balancer (session affinity wouldn't help—data lives in process memory).</li>
+            <li><strong>Scale up, not out:</strong> To handle more load, increase RAM/CPU on the same server. Don't add servers.</li>
+            <li><strong>For multi-server scale-out:</strong> Use the alternate repository variant with SQL Server backend + file share storage. Different architecture.</li>
+          </ul>
+        </div>
+
+        <h2>Monitoring & Maintenance</h2>
+
+        <div class="feature-list">
+          <h4>Log Files</h4>
+          <ul>
+            <li><strong>Python:</strong> <code>python-service/logs/app.log</code> — All requests, LLM calls, errors, timing</li>
+            <li><strong>.NET:</strong> Windows Event Viewer (Application log) — IIS errors, startup/shutdown</li>
+            <li><strong>Rotate logs:</strong> app.log rotates automatically (10 MB max, 5 backups)</li>
+          </ul>
+        </div>
+
+        <div class="feature-list">
+          <h4>Database Maintenance</h4>
+          <ul>
+            <li><strong>Backup:</strong> Copy <code>chatdata.db</code> regularly (contains usage history, keys, experts)</li>
+            <li><strong>Size growth:</strong> UsageLog grows with usage. Expect ~1 KB per question. 1 million questions ≈ 1 GB.</li>
+            <li><strong>Cleanup old data:</strong> Manually delete old UsageLog entries if needed (no built-in retention policy)</li>
+            <li><strong>WAL checkpoint:</strong> Automatic. SQLite merges WAL file into main DB periodically.</li>
+          </ul>
+        </div>
+
+        <div class="feature-list">
+          <h4>Health Checks</h4>
+          <ul>
+            <li><strong>Python API:</strong> <code>GET /api/health</code> — Returns {"status": "ok"} if running</li>
+            <li><strong>Database:</strong> <code>GET /api/admin/users/list</code> (admin only) — Verifies DB connectivity</li>
+            <li><strong>LiteLLM Gateway:</strong> <code>GET /api/admin/models/available</code> (admin only) — Verifies gateway connectivity</li>
+          </ul>
+        </div>
+
+        <h2>Disaster Recovery</h2>
+
+        <div class="key-point">
+          <div class="kp-title">
+            <span class="kp-icon">💾</span>
+            What to Backup
+          </div>
+          <div class="kp-desc">
+            <strong>Critical:</strong> <code>python-service/chatdata.db</code> (encrypted keys, usage history, experts)<br>
+            <strong>Critical:</strong> <code>python-service/.env</code> (especially ENCRYPTION_KEY — can't decrypt keys without it)<br>
+            <strong>Important:</strong> <code>python-service/datasets/</code> (if using Data Experts with file storage)<br>
+            <strong>Optional:</strong> <code>python-service/static/images/ga_logo.png</code> (for Word report branding)<br><br>
+            <strong>In-RAM data:</strong> Cannot be backed up (user sessions, uploaded data). Users re-upload after restart.
+          </div>
+        </div>
+
+        <div class="key-point">
+          <div class="kp-title">
+            <span class="kp-icon">🔄</span>
+            Recovery Procedure
+          </div>
+          <div class="kp-desc">
+            1. Restore <code>.env</code> (especially ENCRYPTION_KEY)<br>
+            2. Restore <code>chatdata.db</code><br>
+            3. Restore <code>datasets/</code> folder (if applicable)<br>
+            4. Restart Python service (<code>python serve.py</code> or Windows service)<br>
+            5. Restart IIS (.NET frontend)<br><br>
+            <strong>Result:</strong> Users can log in (keys decrypted), usage history intact, Data Experts available. In-RAM sessions start fresh.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      General Atomics Aeronautical Systems, Inc. · Chat with Data Technical Architecture Reference Guide · Production v2.0
+    </div>
+  </div>
+
+  <script>
+    function showTab(index) {
+      const tabs = document.querySelectorAll('.tab');
+      const contents = document.querySelectorAll('.tab-content');
+
+      tabs.forEach((tab, i) => {
+        if (i === index) {
+          tab.classList.add('active');
+          contents[i].classList.add('active');
+        } else {
+          tab.classList.remove('active');
+          contents[i].classList.remove('active');
+        }
+      });
+
+      // Scroll to top of content
+      document.querySelector('.content').scrollIntoView({ behavior: 'smooth' });
+    }
+  </script>
+</body>
+</html>

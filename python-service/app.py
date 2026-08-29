@@ -215,11 +215,11 @@ def _run_pipeline(code_messages: list, answer_messages_fn, debug: list,
     answer_messages = answer_messages_fn(result_str, metadata)
     ok, raw_answer  = llm_service.generate_human_answer(answer_messages)
     if not ok:
-        return False, raw_answer, None, debug, None, None, None
+        return False, raw_answer, None, debug, None, None, None, None
 
-    answer, chart = llm_service.parse_answer_response(raw_answer)
+    answer, chart, formatting = llm_service.parse_answer_response(raw_answer)
     debug.append(DebugEntry("Final answer", answer))
-    return True, answer, chart, debug, raw_result, result_str, metadata
+    return True, answer, chart, debug, raw_result, result_str, metadata, formatting
 
 
 # ── Upload (Standard + Variance) ──────────────────────────────────────────────
@@ -351,7 +351,7 @@ def _ask_pipeline(sid, sess, question, mode):
             sess.schema, question, error_feedback=None,
             history=history, prev_result_meta=prev_result_meta,
         )
-        success, answer, chart, debug, raw_result, result_str, metadata = _run_pipeline(
+        success, answer, chart, debug, raw_result, result_str, metadata, formatting = _run_pipeline(
             code_msgs,
             lambda r, m: standard.build_answer_gen_prompt(question, r, history, m),
             debug, prev_result=prev_result, df=sess.df,
@@ -366,7 +366,7 @@ def _ask_pipeline(sid, sess, question, mode):
             sess.schema_a, sess.schema_b, sess.label_a, sess.label_b, question,
             error_feedback=None, history=history, prev_result_meta=prev_result_meta,
         )
-        success, answer, chart, debug, raw_result, result_str, metadata = _run_pipeline(
+        success, answer, chart, debug, raw_result, result_str, metadata, formatting = _run_pipeline(
             code_msgs,
             lambda r, m: variance.build_answer_gen_prompt(question, r, sess.label_a, sess.label_b, history, m),
             debug, prev_result=prev_result, df_a=sess.df_a, df_b=sess.df_b,
@@ -384,12 +384,14 @@ def _ask_pipeline(sid, sess, question, mode):
         sess.last_result_str = result_str
         sess.last_metadata   = metadata
         sess.last_mode       = mode
+        sess.last_formatting = formatting
         save_session(sid, sess)
 
     return jsonify({
         "answer": answer,
         "chart":  chart,
         "debug":  [{"label": d.label, "content": d.content} for d in debug],
+        "formatting": formatting,
     })
 
 
@@ -440,9 +442,11 @@ def ask_refine():
         if not ok:
             return jsonify({"error": raw_answer}), 502
 
-        answer, chart = llm_service.parse_answer_response(raw_answer)
+        answer, chart, formatting = llm_service.parse_answer_response(raw_answer)
+        sess.last_formatting = formatting
+        save_session(sid, sess)
         logger.info(f"Refine ({style}) | sid={sid} | mode={mode}")
-        return jsonify({"answer": answer, "chart": chart})
+        return jsonify({"answer": answer, "chart": chart, "formatting": formatting})
     finally:
         usage_capture.flush(user["UserID"], username, sid, request_id, mode, question, refine=True)
         request_context.end(ctx_tokens)
@@ -641,6 +645,382 @@ def _apply_conditional_formatting(worksheet, df):
         # Continue with export - user gets plain Excel if formatting fails
 
 
+def _apply_llm_formatting(worksheet, df, formatting_rules):
+    """
+    Apply user-requested formatting rules from LLM Call 2 response.
+
+    Phase 2 feature (Enhanced): Supports all 3 tiers of conditional formatting:
+    - Tier 1: Numeric, Text, Null/Empty, Boolean
+    - Tier 2: Text contains, Row-level, Date comparisons
+    - Tier 3: Top/Bottom N, Multiple conditions (AND), Cross-column
+
+    Args:
+        worksheet: openpyxl worksheet object
+        df: pandas DataFrame being exported
+        formatting_rules: dict with "rules" list and optional "row_level" flag
+
+    Supported rule types:
+        1. Numeric: {"column": "Sales", "condition": "<", "value": 1000000, "color": "red"}
+        2. Text: {"column": "Owner", "condition": "==", "value": "John", "color": "yellow"}
+        3. Null: {"column": "Email", "condition": "is_null", "color": "red"}
+        4. Date: {"column": "DueDate", "condition": ">", "value": "2024-01-01", "color": "red"}
+        5. Top/Bottom N: {"column": "Score", "condition": "top_n", "value": 5, "color": "green"}
+        6. Cross-column: {"column": "Actual", "condition": ">", "compare_column": "Budget", "color": "red"}
+        7. Multiple (AND): {"conditions": [{...}, {...}], "operator": "and", "color": "red"}
+    """
+    if not formatting_rules or not isinstance(formatting_rules, dict):
+        return
+
+    rules = formatting_rules.get("rules", [])
+    row_level = formatting_rules.get("row_level", False)
+
+    if not rules:
+        return
+
+    try:
+        from openpyxl.styles import PatternFill
+        from openpyxl.utils import get_column_letter
+        from datetime import datetime
+
+        # Same color scheme as heuristics
+        green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+        yellow_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
+        red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+
+        color_map = {"green": green_fill, "yellow": yellow_fill, "red": red_fill}
+
+        logger.info(f"Applying {len(rules)} LLM formatting rules (row_level={row_level})")
+
+        for rule in rules:
+            try:
+                # Handle multiple conditions (AND logic)
+                if "conditions" in rule:
+                    _apply_multi_condition_rule(worksheet, df, rule, color_map, row_level)
+                    continue
+
+                column = rule.get("column")
+                condition = rule.get("condition")
+                value = rule.get("value")
+                color = rule.get("color")
+                compare_column = rule.get("compare_column")  # For cross-column
+
+                # Validate
+                if not color or color not in color_map:
+                    logger.warning(f"Invalid/unknown color in rule: {rule}")
+                    continue
+
+                fill = color_map[color]
+
+                # Handle different rule types
+                if condition in ["top_n", "bottom_n"]:
+                    _apply_top_bottom_rule(worksheet, df, column, condition, value, fill, row_level)
+                elif compare_column:
+                    _apply_cross_column_rule(worksheet, df, column, condition, compare_column, fill, row_level)
+                elif condition in ["is_null", "is_not_null"]:
+                    _apply_null_rule(worksheet, df, column, condition, fill, row_level)
+                else:
+                    # Standard single-column condition
+                    _apply_standard_rule(worksheet, df, column, condition, value, fill, row_level)
+
+            except Exception as e:
+                logger.warning(f"Failed to apply rule {rule}: {e}")
+                continue
+
+        logger.info("LLM formatting rules applied successfully")
+
+    except Exception as e:
+        logger.warning(f"LLM formatting failed (non-critical): {e}")
+
+
+def _apply_standard_rule(worksheet, df, column, condition, value, fill, row_level):
+    """Apply standard single-column condition (numeric, text, date)."""
+    from openpyxl.utils import get_column_letter
+    from datetime import datetime
+
+    if column not in df.columns:
+        logger.warning(f"Column '{column}' not found")
+        return
+
+    col_idx = df.columns.get_loc(column)
+    col_letter = get_column_letter(col_idx + 1)
+
+    for row_idx in range(2, len(df) + 2):  # Skip header
+        cell = worksheet[f"{col_letter}{row_idx}"]
+        cell_value = cell.value
+
+        try:
+            match = False
+
+            # Numeric conditions
+            if condition in ["<", ">", "<=", ">=", "==", "!="]:
+                # Try numeric first
+                try:
+                    num_value = float(cell_value) if cell_value is not None else None
+                    target_value = float(value) if value is not None else None
+                    if num_value is not None and target_value is not None:
+                        if condition == "<" and num_value < target_value:
+                            match = True
+                        elif condition == ">" and num_value > target_value:
+                            match = True
+                        elif condition == "<=" and num_value <= target_value:
+                            match = True
+                        elif condition == ">=" and num_value >= target_value:
+                            match = True
+                        elif condition == "==" and num_value == target_value:
+                            match = True
+                        elif condition == "!=" and num_value != target_value:
+                            match = True
+                except (ValueError, TypeError):
+                    # Try text comparison
+                    str_value = str(cell_value).strip().lower() if cell_value else ""
+                    target_str = str(value).strip().lower() if value else ""
+                    if condition == "==" and str_value == target_str:
+                        match = True
+                    elif condition == "!=" and str_value != target_str:
+                        match = True
+                    # Try date comparison
+                    try:
+                        date_value = pd.to_datetime(cell_value)
+                        target_date = pd.to_datetime(value)
+                        if condition == "<" and date_value < target_date:
+                            match = True
+                        elif condition == ">" and date_value > target_date:
+                            match = True
+                        elif condition == "<=" and date_value <= target_date:
+                            match = True
+                        elif condition == ">=" and date_value >= target_date:
+                            match = True
+                        elif condition == "==" and date_value == target_date:
+                            match = True
+                    except:
+                        pass
+
+            # Text conditions
+            elif condition in ["contains", "startswith", "endswith"]:
+                str_value = str(cell_value).strip().lower() if cell_value else ""
+                target_str = str(value).strip().lower() if value else ""
+                if condition == "contains" and target_str in str_value:
+                    match = True
+                elif condition == "startswith" and str_value.startswith(target_str):
+                    match = True
+                elif condition == "endswith" and str_value.endswith(target_str):
+                    match = True
+
+            if match:
+                if row_level:
+                    _highlight_row(worksheet, row_idx, len(df.columns), fill)
+                else:
+                    cell.fill = fill
+
+        except Exception as e:
+            continue
+
+
+def _apply_null_rule(worksheet, df, column, condition, fill, row_level):
+    """Apply null/empty check."""
+    from openpyxl.utils import get_column_letter
+
+    if column not in df.columns:
+        logger.warning(f"Column '{column}' not found")
+        return
+
+    col_idx = df.columns.get_loc(column)
+    col_letter = get_column_letter(col_idx + 1)
+
+    for row_idx in range(2, len(df) + 2):
+        cell = worksheet[f"{col_letter}{row_idx}"]
+        cell_value = cell.value
+
+        match = False
+        if condition == "is_null" and (cell_value is None or str(cell_value).strip() == ""):
+            match = True
+        elif condition == "is_not_null" and cell_value is not None and str(cell_value).strip() != "":
+            match = True
+
+        if match:
+            if row_level:
+                _highlight_row(worksheet, row_idx, len(df.columns), fill)
+            else:
+                cell.fill = fill
+
+
+def _apply_top_bottom_rule(worksheet, df, column, condition, n, fill, row_level):
+    """Apply top N or bottom N highlighting."""
+    from openpyxl.utils import get_column_letter
+
+    if column not in df.columns:
+        logger.warning(f"Column '{column}' not found")
+        return
+
+    try:
+        n = int(n) if n else 5
+    except:
+        n = 5
+
+    col_data = pd.to_numeric(df[column], errors='coerce')
+
+    if condition == "top_n":
+        threshold = col_data.nlargest(n).min()
+        matching_rows = df[col_data >= threshold].index
+    else:  # bottom_n
+        threshold = col_data.nsmallest(n).max()
+        matching_rows = df[col_data <= threshold].index
+
+    col_idx = df.columns.get_loc(column)
+    col_letter = get_column_letter(col_idx + 1)
+
+    for idx in matching_rows:
+        row_idx = idx + 2  # +2 for header and 0-indexing
+        if row_level:
+            _highlight_row(worksheet, row_idx, len(df.columns), fill)
+        else:
+            cell = worksheet[f"{col_letter}{row_idx}"]
+            cell.fill = fill
+
+
+def _apply_cross_column_rule(worksheet, df, column, condition, compare_column, fill, row_level):
+    """Apply cross-column comparison."""
+    from openpyxl.utils import get_column_letter
+
+    if column not in df.columns or compare_column not in df.columns:
+        logger.warning(f"Column '{column}' or '{compare_column}' not found")
+        return
+
+    col_idx = df.columns.get_loc(column)
+    col_letter = get_column_letter(col_idx + 1)
+
+    col1_data = pd.to_numeric(df[column], errors='coerce')
+    col2_data = pd.to_numeric(df[compare_column], errors='coerce')
+
+    for row_idx in range(2, len(df) + 2):
+        df_idx = row_idx - 2
+        val1 = col1_data.iloc[df_idx]
+        val2 = col2_data.iloc[df_idx]
+
+        if pd.isna(val1) or pd.isna(val2):
+            continue
+
+        match = False
+        if condition == "<" and val1 < val2:
+            match = True
+        elif condition == ">" and val1 > val2:
+            match = True
+        elif condition == "<=" and val1 <= val2:
+            match = True
+        elif condition == ">=" and val1 >= val2:
+            match = True
+        elif condition == "==" and val1 == val2:
+            match = True
+        elif condition == "!=" and val1 != val2:
+            match = True
+
+        if match:
+            if row_level:
+                _highlight_row(worksheet, row_idx, len(df.columns), fill)
+            else:
+                cell = worksheet[f"{col_letter}{row_idx}"]
+                cell.fill = fill
+
+
+def _apply_multi_condition_rule(worksheet, df, rule, color_map, row_level):
+    """Apply multiple conditions with AND logic."""
+    conditions = rule.get("conditions", [])
+    operator = rule.get("operator", "and")
+    color = rule.get("color")
+
+    if not conditions or not color or color not in color_map:
+        return
+
+    fill = color_map[color]
+
+    # Evaluate each row
+    for row_idx in range(2, len(df) + 2):
+        df_idx = row_idx - 2
+        all_match = True
+
+        for cond in conditions:
+            column = cond.get("column")
+            condition = cond.get("condition")
+            value = cond.get("value")
+
+            if column not in df.columns:
+                all_match = False
+                break
+
+            cell_value = df[column].iloc[df_idx]
+
+            # Evaluate this condition
+            match = _evaluate_single_condition(cell_value, condition, value)
+
+            if operator == "and" and not match:
+                all_match = False
+                break
+
+        if all_match:
+            if row_level:
+                _highlight_row(worksheet, row_idx, len(df.columns), fill)
+            else:
+                # Highlight first column of the multi-condition
+                from openpyxl.utils import get_column_letter
+                first_col = conditions[0].get("column")
+                if first_col in df.columns:
+                    col_idx = df.columns.get_loc(first_col)
+                    col_letter = get_column_letter(col_idx + 1)
+                    cell = worksheet[f"{col_letter}{row_idx}"]
+                    cell.fill = fill
+
+
+def _evaluate_single_condition(cell_value, condition, target_value):
+    """Evaluate a single condition for multi-condition rules."""
+    try:
+        # Numeric
+        if condition in ["<", ">", "<=", ">=", "==", "!="]:
+            try:
+                num_val = float(cell_value) if cell_value is not None else None
+                target_num = float(target_value) if target_value is not None else None
+                if num_val is not None and target_num is not None:
+                    if condition == "<": return num_val < target_num
+                    elif condition == ">": return num_val > target_num
+                    elif condition == "<=": return num_val <= target_num
+                    elif condition == ">=": return num_val >= target_num
+                    elif condition == "==": return num_val == target_num
+                    elif condition == "!=": return num_val != target_num
+            except:
+                # Fall back to text
+                str_val = str(cell_value).strip().lower() if cell_value else ""
+                target_str = str(target_value).strip().lower() if target_value else ""
+                if condition == "==": return str_val == target_str
+                elif condition == "!=": return str_val != target_str
+
+        # Text
+        elif condition in ["contains", "startswith", "endswith"]:
+            str_val = str(cell_value).strip().lower() if cell_value else ""
+            target_str = str(target_value).strip().lower() if target_value else ""
+            if condition == "contains": return target_str in str_val
+            elif condition == "startswith": return str_val.startswith(target_str)
+            elif condition == "endswith": return str_val.endswith(target_str)
+
+        # Null
+        elif condition == "is_null":
+            return cell_value is None or str(cell_value).strip() == ""
+        elif condition == "is_not_null":
+            return cell_value is not None and str(cell_value).strip() != ""
+
+    except:
+        pass
+
+    return False
+
+
+def _highlight_row(worksheet, row_idx, num_cols, fill):
+    """Highlight entire row."""
+    from openpyxl.utils import get_column_letter
+    for col_idx in range(1, num_cols + 1):
+        col_letter = get_column_letter(col_idx)
+        cell = worksheet[f"{col_letter}{row_idx}"]
+        cell.fill = fill
+
+
 @api.route("/export/last_result", methods=["GET"])
 def export_last_result():
     """
@@ -663,6 +1043,10 @@ def export_last_result():
             # Apply conditional formatting (Phase 1: Heuristics)
             worksheet = writer.sheets["Query Result"]
             _apply_conditional_formatting(worksheet, df)
+            # Apply LLM formatting rules (Phase 2) - overlays on heuristics
+            formatting = getattr(sess, "last_formatting", None)
+            if formatting:
+                _apply_llm_formatting(worksheet, df, formatting)
         output.seek(0)
         logger.info(f"Excel export | sid={sid} | rows={len(df)} | cols={len(df.columns)}")
         return send_file(output, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

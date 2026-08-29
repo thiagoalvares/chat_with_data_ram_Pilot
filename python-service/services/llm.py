@@ -119,11 +119,12 @@ def parse_answer_response(raw: str) -> Tuple[str, Optional[dict]]:
         data   = json.loads(cleaned)
         answer = data.get("answer", raw)
         chart  = data.get("chart", None)
-        return answer, chart
+        formatting = data.get("formatting", None)
+        return answer, chart, formatting
 
     except (json.JSONDecodeError, KeyError, ValueError):
         logger.warning("Could not parse LLM answer as JSON — using raw text")
-        return raw, None
+        return raw, None, None
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -136,5 +137,5 @@ def generate_query_code(messages: list) -> Tuple[bool, str]:
 def generate_human_answer(messages: list) -> Tuple[bool, str]:
     """Call 2 — convert result to plain English + optional chart spec."""
     ok, content = _call(messages, temperature=0.3, max_tokens=4096, force_json=True)
-    #logger.info(f"Call 2 raw response: {repr(content[:500])}")
+    logger.info(f"Call 2 raw response: {repr(content[:800])}")
     return ok, content

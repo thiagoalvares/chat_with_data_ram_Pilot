@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat with Data - Architecture Deep Dive</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 2rem;
+      color: #333;
+    }
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+      color: white;
+      padding: 2.5rem;
+      text-align: center;
+    }
+    .header h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+    .header p { font-size: 1.1rem; opacity: 0.9; }
+
+    .tabs {
+      display: flex;
+      background: #f8f9fa;
+      border-bottom: 2px solid #dee2e6;
+      overflow-x: auto;
+    }
+    .tab {
+      padding: 1rem 2rem;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #6c757d;
+      transition: all 0.3s;
+      border-bottom: 3px solid transparent;
+      white-space: nowrap;
+    }
+    .tab:hover { background: #e9ecef; color: #495057; }
+    .tab.active {
+      color: #2a5298;
+      border-bottom-color: #2a5298;
+      background: white;
+    }
+
+    .content { padding: 2.5rem; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; animation: fadeIn 0.4s; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    h2 {
+      color: #1e3c72;
+      margin: 1.5rem 0 1rem;
+      font-size: 1.8rem;
+      border-bottom: 3px solid #2a5298;
+      padding-bottom: 0.5rem;
+    }
+    h3 {
+      color: #2a5298;
+      margin: 1.5rem 0 0.8rem;
+      font-size: 1.3rem;
+    }
+
+    .architecture-diagram {
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      padding: 2rem;
+      border-radius: 12px;
+      margin: 2rem 0;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 2rem;
+    }
+
+    .arch-box {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      text-align: center;
+      min-width: 200px;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .arch-box:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    }
+    .arch-box .icon { font-size: 3rem; margin-bottom: 0.5rem; }
+    .arch-box .title { font-weight: 700; font-size: 1.1rem; color: #1e3c72; margin-bottom: 0.3rem; }
+    .arch-box .desc { font-size: 0.85rem; color: #6c757d; }
+
+    .arrow {
+      font-size: 2.5rem;
+      color: #2a5298;
+      font-weight: bold;
+    }
+
+    .file-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .file-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .file-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    }
+    .file-card .file-name {
+      font-family: 'Courier New', monospace;
+      font-weight: 700;
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+      padding: 0.5rem;
+      background: rgba(255,255,255,0.15);
+      border-radius: 6px;
+    }
+    .file-card .file-desc {
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+    .file-card .badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.25);
+      padding: 0.25rem 0.6rem;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      margin-top: 0.5rem;
+      font-weight: 600;
+    }
+
+    .core-file { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+    .infra-file { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    .safety-file { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+
+    .pipeline {
+      background: white;
+      border: 3px solid #dee2e6;
+      border-radius: 12px;
+      padding: 2rem;
+      margin: 2rem 0;
+    }
+    .pipeline-step {
+      display: flex;
+      align-items: center;
+      margin: 1.5rem 0;
+      padding: 1.5rem;
+      background: linear-gradient(90deg, #f8f9fa 0%, #e9ecef 100%);
+      border-radius: 8px;
+      border-left: 5px solid #2a5298;
+    }
+    .pipeline-step .step-num {
+      background: #2a5298;
+      color: white;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.2rem;
+      margin-right: 1.5rem;
+      flex-shrink: 0;
+    }
+    .pipeline-step .step-content {
+      flex: 1;
+    }
+    .pipeline-step .step-title {
+      font-weight: 700;
+      color: #1e3c72;
+      margin-bottom: 0.3rem;
+      font-size: 1.1rem;
+    }
+    .pipeline-step .step-desc {
+      color: #6c757d;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .safeguard-list {
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      padding: 2rem;
+      border-radius: 12px;
+      margin: 2rem 0;
+    }
+    .safeguard-item {
+      background: white;
+      padding: 1.2rem;
+      margin: 1rem 0;
+      border-radius: 8px;
+      border-left: 5px solid #43e97b;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .safeguard-item .sg-title {
+      font-weight: 700;
+      color: #1e3c72;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .safeguard-item .sg-icon {
+      font-size: 1.5rem;
+    }
+    .safeguard-item .sg-desc {
+      color: #495057;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+    .safeguard-item .sg-file {
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+      color: #6c757d;
+      margin-top: 0.5rem;
+      padding: 0.3rem 0.6rem;
+      background: #f8f9fa;
+      border-radius: 4px;
+      display: inline-block;
+    }
+
+    .feature-box {
+      background: white;
+      border: 2px solid #dee2e6;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1rem 0;
+    }
+    .feature-box .fb-title {
+      font-weight: 700;
+      color: #2a5298;
+      font-size: 1.1rem;
+      margin-bottom: 0.8rem;
+    }
+    .feature-box ul {
+      list-style: none;
+      padding-left: 0;
+    }
+    .feature-box li {
+      padding: 0.5rem 0;
+      padding-left: 1.5rem;
+      position: relative;
+      color: #495057;
+      line-height: 1.6;
+    }
+    .feature-box li:before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: #43e97b;
+      font-weight: 700;
+      font-size: 1.2rem;
+    }
+
+    .golden-rule {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+      padding: 2rem;
+      border-radius: 12px;
+      margin: 2rem 0;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    }
+    .golden-rule h3 {
+      color: white;
+      margin-top: 0;
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .golden-rule p {
+      line-height: 1.8;
+      font-size: 1.05rem;
+    }
+    .golden-rule .files {
+      font-family: 'Courier New', monospace;
+      background: rgba(255,255,255,0.15);
+      padding: 1rem;
+      border-radius: 6px;
+      margin-top: 1rem;
+      font-size: 0.9rem;
+    }
+
+    code {
+      background: #f8f9fa;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+      color: #e83e8c;
+    }
+
+    .flow-diagram {
+      text-align: center;
+      padding: 2rem;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      border-radius: 12px;
+      margin: 2rem 0;
+    }
+    .flow-box {
+      display: inline-block;
+      background: white;
+      padding: 1rem 2rem;
+      margin: 0.5rem;
+      border-radius: 8px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+      font-weight: 600;
+      color: #1e3c72;
+    }
+    .flow-arrow {
+      font-size: 2rem;
+      color: #2a5298;
+      margin: 0 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🧠 Chat with Data - Architecture Deep Dive</h1>
+      <p>Understanding the harness, safeguards, and infrastructure around the AI</p>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="showTab(0)">📐 Overview</button>
+      <button class="tab" onclick="showTab(1)">📂 Core Files</button>
+      <button class="tab" onclick="showTab(2)">🔄 The Pipeline</button>
+      <button class="tab" onclick="showTab(3)">🛡️ The Harness</button>
+      <button class="tab" onclick="showTab(4)">⚙️ Infrastructure</button>
+      <button class="tab" onclick="showTab(5)">🚀 Data Flow</button>
+      <button class="tab" onclick="showTab(6)">📊 Rollout Features</button>
+    </div>
+
+    <div class="content">
+      <!-- TAB 0: Overview -->
+      <div class="tab-content active">
+        <h2>High-Level Architecture</h2>
+        <div class="architecture-diagram">
+          <div class="arch-box">
+            <div class="icon">🌐</div>
+            <div class="title">Browser</div>
+            <div class="desc">User uploads data<br>asks questions</div>
+          </div>
+
+          <div class="arrow">→</div>
+
+          <div class="arch-box">
+            <div class="icon">🏗️</div>
+            <div class="title">.NET Frontend</div>
+            <div class="desc">Port 5080<br>UI + Session + Proxy</div>
+          </div>
+
+          <div class="arrow">→</div>
+
+          <div class="arch-box">
+            <div class="icon">🐍</div>
+            <div class="title">Python Backend</div>
+            <div class="desc">Port 8000<br>Flask + RAM Storage</div>
+          </div>
+
+          <div class="arrow">→</div>
+
+          <div class="arch-box">
+            <div class="icon">🤖</div>
+            <div class="title">LiteLLM Gateway</div>
+            <div class="desc">AI model proxy<br>Usage tracking</div>
+          </div>
+        </div>
+
+        <div class="golden-rule">
+          <h3>⚠️ The Golden Rule</h3>
+          <p>The <strong>analytical core</strong> is byte-for-byte identical to the validated prototype. These files are <strong>NEVER modified</strong> — they're the proven, tested heart of the application:</p>
+          <div class="files">
+• services/llm.py — Two-call LLM pipeline (Call 1: code, Call 2: answer)<br>
+• services/executor.py — Executes pandas code in isolated namespace<br>
+• services/file_handler.py — CSV/Excel reading, schema extraction<br>
+• prompts/standard.py — Standard mode system prompts<br>
+• prompts/variance.py — Variance mode system prompts
+          </div>
+          <p style="margin-top:1rem"><strong>Everything else is infrastructure</strong> — the harness we've built around these core files to make the app production-ready.</p>
+        </div>
+
+        <h2>What Makes This App Different</h2>
+        <div class="feature-box">
+          <div class="fb-title">🎯 Not Just "Chat with AI"</div>
+          <ul>
+            <li><strong>Stateful + In-RAM:</strong> ONE Python process, all session data in memory (fast follow-ups)</li>
+            <li><strong>Two-Call Pipeline:</strong> LLM generates pandas code → execute → LLM explains result</li>
+            <li><strong>Per-User API Keys:</strong> Every user brings their own LiteLLM key (Fernet encrypted)</li>
+            <li><strong>Exact Cost Tracking:</strong> Token-level usage logging with model-specific pricing</li>
+            <li><strong>Session-Based Model Selection:</strong> Users choose their AI model per session</li>
+            <li><strong>Zero Estimation:</strong> Every number comes from executed pandas code, not AI guesses</li>
+            <li><strong>Request Context:</strong> Thread-safe per-request state for keys/models (contextvars)</li>
+            <li><strong>Usage Capture Proxy:</strong> Intercepts responses to log tokens WITHOUT modifying core files</li>
+          </ul>
+        </div>
+
+        <h2>Design Philosophy</h2>
+        <div class="feature-box">
+          <div class="fb-title">🧱 The Harness Approach</div>
+          <ul>
+            <li><strong>Analytical core = untouchable:</strong> Proven prototype logic stays frozen</li>
+            <li><strong>Infrastructure = flexible:</strong> Add features via wrappers, proxies, envelopes</li>
+            <li><strong>Additive only:</strong> New features wrap around core, never modify it</li>
+            <li><strong>Fail-safe:</strong> Every safeguard can fail without breaking the core pipeline</li>
+            <li><strong>Thread-safe:</strong> Single process, many threads (I/O-bound workload)</li>
+            <li><strong>Session-scoped:</strong> In-RAM state clears on restart (acceptable for pilot)</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- TAB 1: Core Files -->
+      <div class="tab-content">
+        <h2>Core Files (The Analytical Heart)</h2>
+        <p>These files are <strong>byte-for-byte unchanged</strong> from the validated prototype. They handle all data manipulation and AI interactions.</p>
+
+        <div class="file-grid">
+          <div class="file-card core-file">
+            <div class="file-name">services/llm.py</div>
+            <div class="file-desc">
+              The two-call LLM pipeline:<br>
+              • <code>generate_query_code()</code> — Call 1: generate pandas code (temp=0)<br>
+              • <code>generate_human_answer()</code> — Call 2: explain result + chart spec (temp=0.3)<br>
+              • <code>parse_answer_response()</code> — Extract JSON from AI response<br>
+              • Force JSON mode for GPT models, enhanced prefix stripping
+            </div>
+            <span class="badge">GOLDEN RULE: Read-Only</span>
+          </div>
+
+          <div class="file-card core-file">
+            <div class="file-name">services/executor.py</div>
+            <div class="file-desc">
+              Executes generated pandas code in an isolated namespace:<br>
+              • One namespace per mode (standard/variance)<br>
+              • <code>df</code> pre-loaded, <code>pd</code> and <code>np</code> available<br>
+              • Returns result + metadata (type, rows, columns)<br>
+              • Captures errors for retry logic
+            </div>
+            <span class="badge">GOLDEN RULE: Read-Only</span>
+          </div>
+
+          <div class="file-card core-file">
+            <div class="file-name">services/file_handler.py</div>
+            <div class="file-desc">
+              CSV/Excel reading and schema extraction:<br>
+              • Auto-detects encoding (UTF-8, UTF-8-sig, Latin-1)<br>
+              • Multi-sheet Excel support<br>
+              • Generates schema info for LLM context<br>
+              • Type inference (numeric, date, categorical)
+            </div>
+            <span class="badge">GOLDEN RULE: Read-Only</span>
+          </div>
+
+          <div class="file-card core-file">
+            <div class="file-name">prompts/standard.py</div>
+            <div class="file-desc">
+              System prompts for Standard mode:<br>
+              • <code>build_code_gen_prompt()</code> — Code generation rules<br>
+              • <code>build_answer_gen_prompt()</code> — Answer formatting rules<br>
+              • Includes planning guidance, syntax checks, no estimation rule
+            </div>
+            <span class="badge">GOLDEN RULE: Read-Only (infra changes OK)</span>
+          </div>
+
+          <div class="file-card core-file">
+            <div class="file-name">prompts/variance.py</div>
+            <div class="file-desc">
+              System prompts for Variance mode:<br>
+              • Same structure as standard.py<br>
+              • Handles two DataFrames (baseline vs current)<br>
+              • Variance-specific calculations and comparisons
+            </div>
+            <span class="badge">GOLDEN RULE: Read-Only (infra changes OK)</span>
+          </div>
+        </div>
+
+        <h2>Infrastructure Files (The Harness)</h2>
+        <p>These files wrap around the core to add production features: sessions, auth, usage tracking, model selection, etc.</p>
+
+        <div class="file-grid">
+          <div class="file-card infra-file">
+            <div class="file-name">app.py</div>
+            <div class="file-desc">
+              Flask REST API + all endpoints:<br>
+              • <code>/api/upload/*</code> — file uploads<br>
+              • <code>/api/ask</code> — question pipeline (additive envelope)<br>
+              • <code>/api/ask/refine</code> — re-run Call 2 only<br>
+              • <code>/api/user/*</code> — API keys, usage, model selection<br>
+              • <code>/api/admin/*</code> — admin dashboard endpoints<br>
+              • Wraps core pipeline with per-user context + usage tracking
+            </div>
+            <span class="badge">Infrastructure</span>
+          </div>
+
+          <div class="file-card infra-file">
+            <div class="file-name">services/data_manager.py</div>
+            <div class="file-desc">
+              In-RAM session storage:<br>
+              • <code>SessionData</code> class — all per-user state<br>
+              • DataFrames (standard/variance modes)<br>
+              • Chat history (per mode)<br>
+              • Last result (for Excel export)<br>
+              • User model preference (session-scoped)
+            </div>
+            <span class="badge">Infrastructure</span>
+          </div>
+
+          <div class="file-card infra-file">
+            <div class="file-name">services/request_context.py</div>
+            <div class="file-desc">
+              Thread-safe per-request state (contextvars):<br>
+              • <code>user_api_key</code> — dynamic per user<br>
+              • <code>active_model</code> — user preference or admin default<br>
+              • <code>usage_records</code> — token captures per request<br>
+              • Config.py reads from here (dynamic properties)
+            </div>
+            <span class="badge">Infrastructure</span>
+          </div>
+
+          <div class="file-card infra-file">
+            <div class="file-name">services/usage_capture.py</div>
+            <div class="file-desc">
+              Captures LLM usage WITHOUT touching llm.py:<br>
+              • <code>install()</code> — swaps requests library with proxy<br>
+              • Intercepts responses, copies token counts<br>
+              • <code>flush()</code> — writes to database with context<br>
+              • Core file (llm.py) remains byte-identical
+            </div>
+            <span class="badge">Infrastructure</span>
+          </div>
+
+          <div class="file-card infra-file">
+            <div class="file-name">services/database.py</div>
+            <div class="file-desc">
+              SQLite persistence (chatdata.db):<br>
+              • Users table — encrypted API keys<br>
+              • UsageLog table — per-request tokens/cost<br>
+              • ModelConfig table — admin default model<br>
+              • DataExperts table — admin-published datasets<br>
+              • All timestamps UTC, WAL journal mode
+            </div>
+            <span class="badge">Infrastructure</span>
+          </div>
+
+          <div class="file-card infra-file">
+            <div class="file-name">services/pricing.py</div>
+            <div class="file-desc">
+              Model pricing for cost calculation:<br>
+              • Hardcoded USD per 1M tokens (input/output)<br>
+              • 4 verified models with exact pricing<br>
+              • Falls back to DEFAULT_PRICING for unknowns<br>
+              • Keep in sync with gateway billing
+            </div>
+            <span class="badge">Infrastructure</span>
+          </div>
+
+          <div class="file-card infra-file">
+            <div class="file-name">services/crypto.py</div>
+            <div class="file-desc">
+              Fernet encryption for API keys:<br>
+              • <code>encrypt_api_key()</code> — before DB write<br>
+              • <code>decrypt_api_key()</code> — on read<br>
+              • <code>mask_api_key()</code> — for UI display<br>
+              • Requires ENCRYPTION_KEY in .env
+            </div>
+            <span class="badge">Security</span>
+          </div>
+
+          <div class="file-card infra-file">
+            <div class="file-name">services/admin_auth.py</div>
+            <div class="file-desc">
+              Admin permission checks:<br>
+              • <code>is_admin()</code> — checks username vs ADMIN_USERS env<br>
+              • <code>require_admin()</code> — decorator for endpoints<br>
+              • Returns 403 if not admin
+            </div>
+            <span class="badge">Security</span>
+          </div>
+
+          <div class="file-card infra-file">
+            <div class="file-name">config.py</div>
+            <div class="file-desc">
+              Environment configuration + dynamic properties:<br>
+              • <code>Config.LITELLM_API_KEY</code> → reads from request_context<br>
+              • <code>Config.LLM_MODEL</code> → user preference or admin default<br>
+              • Falls back to _ENV_* constants if no context<br>
+              • Thread-safe via contextvars
+            </div>
+            <span class="badge">Infrastructure</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: The Pipeline -->
+      <div class="tab-content">
+        <h2>The Two-Call Pipeline</h2>
+        <p>Every question flows through this exact sequence. This is the <strong>proven prototype logic</strong> that never changes.</p>
+
+        <div class="pipeline">
+          <div class="pipeline-step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <div class="step-title">📤 User Asks Question</div>
+              <div class="step-desc">
+                Browser sends question + mode to .NET → .NET forwards to Python with <code>X-Session-Id</code> header.
+                Python loads session from RAM, retrieves uploaded DataFrame.
+              </div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <div class="step-title">🧠 Call 1: Generate Pandas Code</div>
+              <div class="step-desc">
+                <code>llm.generate_query_code()</code> sends schema + question to LLM (temp=0 for determinism).
+                Returns Python code that queries the DataFrame. No execution yet.
+                <br><strong>File:</strong> <code>services/llm.py</code> + <code>prompts/standard.py</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <div class="step-title">⚙️ Execute Code</div>
+              <div class="step-desc">
+                <code>executor.execute_generated_code()</code> runs the code in an isolated namespace.
+                DataFrame is pre-loaded as <code>df</code>. Returns <code>result</code> + metadata (type, shape).
+                If execution fails → inject error into prompt → retry once.
+                <br><strong>File:</strong> <code>services/executor.py</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">4</div>
+            <div class="step-content">
+              <div class="step-title">📊 Call 2: Generate Human Answer</div>
+              <div class="step-desc">
+                <code>llm.generate_human_answer()</code> sends result + metadata to LLM (temp=0.3 for natural language).
+                Returns JSON: <code>{"answer": "...", "chart": {...}}</code>
+                Enhanced JSON parsing strips GPT prefixes, handles markdown fences.
+                <br><strong>File:</strong> <code>services/llm.py</code> + <code>prompts/standard.py</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">5</div>
+            <div class="step-content">
+              <div class="step-title">🎨 Render Chart (Frontend)</div>
+              <div class="step-desc">
+                Browser receives answer + chart spec. If chart exists, Chart.js renders it (bar/line/pie/scatter).
+                User can switch chart types client-side (same data, different visualization).
+                <br><strong>File:</strong> <code>dotnet-app/wwwroot/index.html</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">6</div>
+            <div class="step-content">
+              <div class="step-title">💾 Store + Log</div>
+              <div class="step-desc">
+                Session updated with last result (for Excel export + refine feature).
+                Usage capture writes token counts + cost to database.
+                History appended (for conversational context in next question).
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <h2>Auto-Retry Logic</h2>
+        <div class="feature-box">
+          <div class="fb-title">🔄 When Code Execution Fails</div>
+          <ul>
+            <li>Capture error message from executor</li>
+            <li>Inject error into prompt: "Your code failed with: [error]. Return ONLY fixed code."</li>
+            <li>Call LLM again (Call 1 retry)</li>
+            <li>Execute retry code</li>
+            <li>If retry fails → return error to user (no infinite loop)</li>
+            <li>If retry succeeds → continue to Call 2 as normal</li>
+          </ul>
+        </div>
+
+        <h2>Prompt Engineering Safeguards</h2>
+        <div class="safeguard-list">
+          <div class="safeguard-item">
+            <div class="sg-title">
+              <span class="sg-icon">🧮</span>
+              No Estimation Rule
+            </div>
+            <div class="sg-desc">
+              <strong>Critical:</strong> All numbers must come DIRECTLY from the data result or metadata.
+              Never calculate, count, sum, estimate, or derive numbers yourself. Even for "insights" — no speculation.
+              If data is truncated (<code>...</code>), write "Data not available" instead of guessing.
+            </div>
+            <div class="sg-file">prompts/standard.py (line 90-96)</div>
+          </div>
+
+          <div class="safeguard-item">
+            <div class="sg-title">
+              <span class="sg-icon">📏</span>
+              Row Count Clarity
+            </div>
+            <div class="sg-desc">
+              The CSV header row is NOT in the DataFrame — it's been converted to column names.
+              <code>df.shape[0]</code> and <code>len(df)</code> return ONLY data rows. Do NOT add +1 or -1.
+              If CSV has 1 header + 100 data rows, then <code>len(df) = 100</code> (correct answer).
+            </div>
+            <div class="sg-file">prompts/standard.py (line 9-11)</div>
+          </div>
+
+          <div class="safeguard-item">
+            <div class="sg-title">
+              <span class="sg-icon">📐</span>
+              Planning Guidance
+            </div>
+            <div class="sg-desc">
+              For complex multi-step operations: plan your approach before coding.
+              Break into 2-3 clear intermediate steps with descriptive variable names (e.g., df_grouped, df_merged).
+              Aim for code under 100 lines. Ensure all string literals, parentheses, and brackets are properly closed.
+            </div>
+            <div class="sg-file">prompts/standard.py (line 42-44)</div>
+          </div>
+
+          <div class="safeguard-item">
+            <div class="sg-title">
+              <span class="sg-icon">🧹</span>
+              Data Cleaning Rules
+            </div>
+            <div class="sg-desc">
+              Always apply before modeling: convert dates with <code>pd.to_datetime(..., errors='coerce')</code>,
+              convert Categorical columns to string, strip currency symbols, use <code>pd.to_numeric(..., errors='coerce')</code>,
+              drop or fill NaN values before fitting any ML model.
+            </div>
+            <div class="sg-file">prompts/standard.py (line 25-31)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: The Harness -->
+      <div class="tab-content">
+        <h2>The Harness: Production Safeguards Around the Core</h2>
+        <p>These are the layers we've built <strong>around</strong> the analytical core to make it production-ready.</p>
+
+        <div class="safeguard-list">
+          <div class="safeguard-item">
+            <div class="sg-title">
+              <span class="sg-icon">🔐</span>
+              Per-User API Keys (Encrypted)
+            </div>
+            <div class="sg-desc">
+              Every user stores their OWN LiteLLM key. Keys are Fernet-encrypted before storage in SQLite.
+              On every request: decrypt user's key → set in request_context → config.py serves it to llm.py.
+              <strong>Golden rule preserved:</strong> llm.py unchanged, just reads from Config.LITELLM_API_KEY.
+              <br><br>
+              <strong>Blocking onboarding modal</strong> when no key is set. Key validation on save.
+              Admin can see usage but cannot see other users' keys.
+            </div>
+            <div class="sg-file">services/crypto.py, services/database.py, app.py (_resolve_user_context)</div>
+          </div>
+
+          <div class="safeguard-item">
+            <div class="sg-title">
+              <span class="sg-icon">🧵</span>
+              Thread-Safe Per-Request Context
+            </div>
+            <div class="sg-desc">
+              Single Python process, many threads (I/O-bound). How do we serve different users' keys/models per request?
+              <br><br>
+              <strong>Answer: contextvars.</strong> <code>request_context.py</code> uses Python's contextvars module.
+              Each request gets its own isolated context: <code>user_api_key.set()</code>, <code>active_model.set()</code>.
+              Config.py uses <code>@property</code> to read from context dynamically.
+              <br><br>
+              Request starts → <code>request_context.begin(key, model)</code> → returns token → request ends → <code>request_context.end(token)</code> cleans up.
+            </div>
+            <div class="sg-file">services/request_context.py, config.py (dynamic properties)</div>
+          </div>
+
+          <div class="safeguard-item">
+            <div class="sg-title">
+              <span class="sg-icon">📊</span>
+              Usage Capture WITHOUT Modifying Core
+            </div>
+            <div class="sg-desc">
+              <strong>The Problem:</strong> We need to log tokens/cost from every LLM call, but llm.py is read-only.
+              <br><br>
+              <strong>The Solution:</strong> Proxy pattern. <code>usage_capture.install()</code> swaps <code>llm.requests</code>
+              (the imported requests library) with a thin proxy. The proxy delegates to real requests,
+              but intercepts responses to copy the <code>usage</code> block into request_context.
+              <br><br>
+              After pipeline finishes, <code>usage_capture.flush()</code> writes records to database with user/session/question context.
+              <strong>llm.py file is byte-identical</strong> — it still calls <code>requests.post()</code> exactly as before.
+            </div>
+            <div class="sg-file">services/usage_capture.py, app.py (flush after ask/refine)</div>
+          </div>
+
+          <div class="safeguard-item">
+            <div class="sg-title">
+              <span class="sg-icon">🎛️</span>
+              Session-Based Model Selection
+            </div>
+            <div class="sg-desc">
+              Users can override the admin default model for their session (in-RAM, lost on restart).
+              Dropdown in header shows 4 verified working models with pricing. Badge shows active model.
+              <br><br>
+              <strong>Flow:</strong> User changes dropdown → <code>/api/user/set_model</code> → saves to session.user_model_preference →
+              next <code>/api/ask</code> → <code>_resolve_user_context()</code> checks session → passes to request_context.begin() →
+              config.py serves it to llm.py.
+              <br><br>
+              Falls back to admin default when no preference set. Admin can change global default (all new sessions use it).
+            </div>
+            <div class="sg-file">services/data_manager.py (user_model_preference), app.py (set_model/get_model)</div>
+          </div>
+
+          <div class="safeguard-item">
+            <div class="sg-title">
+              <span class="sg-icon">💰</span>
+              Exact Cost Tracking
+            </div>
+            <div class="sg-desc">
+              Every LLM call logs: prompt_tokens, completion_tokens, total_tokens, model name.
+              Cost calculated using model-specific pricing: <code>(tokens / 1M) × price_per_1M</code>.
+              <br><br>
+              Stored in UsageLog table with: UserID, SessionID, RequestID (one per question), Mode, QuestionText (truncated 500 chars),
+              CallType (call1_codegen, call2_answer, refine_answer), timestamp, success flag.
+              <br><br>
+              <strong>Dashboard shows:</strong> total questions (COUNT DISTINCT RequestID), total cost, avg cost per question,
+              usage over time chart, history table. Admin sees all users aggregated.
+            </div>
+            <div class="sg-file">services/database.py (UsageLog table), services/pricing.py, app.py (flush)</div>
+          </div>
+
+          <div class="safeguard-item">
+            <div class="sg-title">
+              <span class="sg-icon">🧪</span>
+              Enhanced Multi-Model JSON Parsing
+            </div>
+            <div class="sg-desc">
+              Different models format JSON differently. GPT adds prefixes like "Here's the answer: {...}".
+              Some models wrap in markdown fences: <code>```json {...} ```</code>.
+              <br><br>
+              <strong>Solution:</strong> <code>parse_answer_response()</code> in llm.py strips known prefixes,
+              removes markdown fences, finds first <code>{</code> and last <code>}</code>, extracts just the JSON.
+              <br><br>
+              <strong>Plus:</strong> For GPT/o1 models, we set <code>response_format: {"type": "json_object"}</code> in the API call
+              (JSON mode) — forces valid JSON at the source. Two-layer defense.
+            </div>
+            <div class="sg-file">services/llm.py (parse_answer_response, force_json parameter)</div>
+          </div>
+
+          <div class="safeguard-item">
+            <div class="sg-title">
+              <span class="sg-icon">🔒</span>
+              Identity & Authorization
+            </div>
+            <div class="sg-desc">
+              <strong>Identity:</strong> X-User header from .NET. When Windows Auth is ON = Windows username.
+              When OFF = Auth:DevUsername (appsettings) or machine username. No separate login system.
+              <br><br>
+              <strong>Admin:</strong> ADMIN_USERS env var (comma-separated). <code>is_admin()</code> checks username.
+              Admin endpoints use <code>@require_admin</code> decorator (403 if not admin).
+              <br><br>
+              <strong>Optional:</strong> INTERNAL_API_SECRET — shared secret between .NET and Python.
+              Enable when Python runs on different machine than .NET (prevents X-User spoofing on network).
+            </div>
+            <div class="sg-file">app.py (_username, _check_internal_secret), services/admin_auth.py</div>
+          </div>
+
+          <div class="safeguard-item">
+            <div class="sg-title">
+              <span class="sg-icon">💾</span>
+              In-RAM Session Storage (Stateful)
+            </div>
+            <div class="sg-desc">
+              All session state lives in Python process memory (STORAGE_BACKEND=memory).
+              Keyed by <code>X-Session-Id</code> from .NET cookie.
+              <br><br>
+              <strong>What's stored:</strong> uploaded DataFrames (standard/variance), schema, chat history (per mode),
+              last result (for Excel export), user model preference, file labels.
+              <br><br>
+              <strong>Trade-off:</strong> Fast (no DB/disk I/O), but restart clears all. Acceptable for pilot.
+              ONE process only — never run multiple workers (would split sessions).
+            </div>
+            <div class="sg-file">services/data_manager.py (SessionData class), services/storage.py (memory backend)</div>
+          </div>
+
+          <div class="safeguard-item">
+            <div class="sg-title">
+              <span class="sg-icon">📝</span>
+              Conversational History (Mode-Specific)
+            </div>
+            <div class="sg-desc">
+              Chat history stored per mode (standard/variance separate). Last Q&A pair sent to LLM for context.
+              Helps with follow-up questions: "what about the top 10?" → LLM sees previous question + result.
+              <br><br>
+              <strong>Clear Chat:</strong> Clears only the active mode's history (per-tab transcript in frontend).
+              Upload clears its own mode's history (doesn't touch other modes).
+            </div>
+            <div class="sg-file">services/data_manager.py (history_standard, history_variance), app.py (clear_history)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: Infrastructure -->
+      <div class="tab-content">
+        <h2>Infrastructure Components</h2>
+
+        <h3>🗄️ Database (SQLite with WAL)</h3>
+        <div class="feature-box">
+          <div class="fb-title">Tables & Purpose</div>
+          <ul>
+            <li><strong>Users:</strong> UserID, Username, APIKey (encrypted), CreatedAt, UpdatedAt, LastLogin, IsActive</li>
+            <li><strong>UsageLog:</strong> LogID, UserID, Username, SessionID, RequestID, Timestamp, Mode, QuestionText (500 chars), CallType, Model, PromptTokens, CompletionTokens, TotalTokens, PromptCost, CompletionCost, TotalCost, Success, ErrorMessage</li>
+            <li><strong>ModelConfig:</strong> ConfigID, ModelName, IsActive (only one active), SetBy, SetAt, InputPrice, OutputPrice</li>
+            <li><strong>ModelChangeLog:</strong> ChangeID, PreviousModel, NewModel, ChangedBy, ChangedAt, Reason</li>
+            <li><strong>DataExperts:</strong> ExpertID, Label, Description, FilePath, SheetName, AccessMode, AllowedUsers, AllowedGroups, RecommendedQuestions, Rows, Cols, IsActive, CreatedBy, CreatedAt, UpdatedBy, UpdatedAt, SourceType, SourceConfig, SqlQuery</li>
+          </ul>
+        </div>
+
+        <div class="feature-box">
+          <div class="fb-title">Design Notes</div>
+          <ul>
+            <li><strong>WAL journal mode:</strong> Safe concurrent readers with writes (single process, many threads)</li>
+            <li><strong>RequestID:</strong> One UUID per question. Questions counted as COUNT(DISTINCT RequestID). Survives retries.</li>
+            <li><strong>Timestamps:</strong> All stored as UTC 'YYYY-MM-DD HH:MM:SS' strings. Consistent comparisons.</li>
+            <li><strong>DB path:</strong> Anchored to python-service folder (not CWD). Override with DB_PATH env.</li>
+            <li><strong>QuestionText truncated:</strong> 500 chars (analytics doesn't need full prompts on disk forever)</li>
+          </ul>
+        </div>
+
+        <h3>🔧 Configuration Management</h3>
+        <div class="feature-box">
+          <div class="fb-title">Environment Variables (.env)</div>
+          <ul>
+            <li><strong>LITELLM_API_BASE:</strong> Gateway URL (e.g., https://aigateway.ga.com)</li>
+            <li><strong>LITELLM_API_KEY:</strong> Fallback key (used when user has none, or for admin endpoints)</li>
+            <li><strong>LLM_MODEL:</strong> Fallback model (used when no admin default set in DB)</li>
+            <li><strong>LLM_MAX_TOKENS:</strong> Default 1024 (code gen), 4096 (answer gen)</li>
+            <li><strong>LLM_TIMEOUT:</strong> Default 120 seconds</li>
+            <li><strong>ENCRYPTION_KEY:</strong> Fernet key for API key encryption (required for rollout)</li>
+            <li><strong>ADMIN_USERS:</strong> Comma-separated usernames (e.g., "alice,bob,charlie")</li>
+            <li><strong>INTERNAL_API_SECRET:</strong> Optional shared secret (.NET sends in X-Internal-Auth)</li>
+            <li><strong>DB_PATH:</strong> Optional override for chatdata.db location</li>
+            <li><strong>STORAGE_BACKEND:</strong> memory (default), disk, sqlserver (memory only for this pilot)</li>
+          </ul>
+        </div>
+
+        <div class="feature-box">
+          <div class="fb-title">Dynamic Properties (config.py)</div>
+          <ul>
+            <li><strong>Config.LITELLM_API_KEY:</strong> Reads from <code>request_context.user_api_key</code> or falls back to <code>_ENV_LITELLM_API_KEY</code></li>
+            <li><strong>Config.LLM_MODEL:</strong> Reads from <code>request_context.active_model</code> or falls back to <code>_ENV_LLM_MODEL</code></li>
+            <li>These properties are called by llm.py — it stays unchanged, config.py handles the routing</li>
+          </ul>
+        </div>
+
+        <h3>🚀 Serving & Deployment</h3>
+        <div class="feature-box">
+          <div class="fb-title">Local Development</div>
+          <ul>
+            <li><strong>./run.sh</strong> (macOS/Linux) or <strong>.\run.ps1</strong> (Windows): Starts both .NET and Python</li>
+            <li>.NET: <code>dotnet run -c Release</code> (port 5080)</li>
+            <li>Python: <code>python app.py</code> (Flask dev server, port 8000)</li>
+            <li>Open http://localhost:5080</li>
+          </ul>
+        </div>
+
+        <div class="feature-box">
+          <div class="fb-title">Production (Single Server)</div>
+          <ul>
+            <li><strong>Python:</strong> <code>python serve.py</code> — Waitress WSGI server, ONE process, WAITRESS_THREADS (default 16), binds 127.0.0.1:8000</li>
+            <li><strong>.NET:</strong> IIS hosting, points PythonService:BaseUrl at http://localhost:8000</li>
+            <li><strong>Windows Service:</strong> Use NSSM to register serve.py for auto-start/restart</li>
+            <li><strong>Environment:</strong> Requires .NET SDK 8.0, Python 3.10+, pip install -r requirements.txt</li>
+          </ul>
+        </div>
+
+        <div class="feature-box">
+          <div class="fb-title">⚠️ Critical Constraints</div>
+          <ul>
+            <li><strong>ONE process only:</strong> Never run multiple Python workers/instances (in-RAM sessions would split)</li>
+            <li><strong>Threads are fine:</strong> Workload is I/O-bound (waiting on LLM), threads handle concurrency</li>
+            <li><strong>Restart = data loss:</strong> All sessions cleared (no persistence by design)</li>
+            <li><strong>Port 5000 on macOS:</strong> AirPlay conflict — .NET uses 5080 instead</li>
+            <li><strong>Windows:</strong> Use waitress (serve.py), not gunicorn (Linux-only)</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- TAB 5: Data Flow -->
+      <div class="tab-content">
+        <h2>Complete Data Flow</h2>
+        <p>From file upload to final answer, every step explained.</p>
+
+        <div class="flow-diagram">
+          <div class="flow-box">📤 Browser Upload</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box">.NET Proxy</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box">🐍 Python /upload</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box">💾 RAM Storage</div>
+        </div>
+
+        <div class="pipeline">
+          <div class="pipeline-step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <div class="step-title">📁 File Upload</div>
+              <div class="step-desc">
+                User selects CSV/Excel → Browser sends to .NET <code>/upload/standard</code> or <code>/upload/variance/{a|b}</code><br>
+                .NET: Resolves session cookie (<code>cwd_sid</code>), forwards to Python with <code>X-Session-Id</code> header<br>
+                Python: <code>/api/upload/standard</code> endpoint receives file
+              </div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <div class="step-title">📊 File Processing</div>
+              <div class="step-desc">
+                <code>file_handler.read_file()</code> → auto-detects encoding (UTF-8, UTF-8-sig, Latin-1)<br>
+                Multi-sheet Excel: user selects sheet → reads specific sheet<br>
+                Returns: pandas DataFrame + schema info (column names, types, sample values)<br>
+                <strong>Insights generated:</strong> starter questions, data profile, anomalies (pure pandas, zero LLM)
+              </div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <div class="step-title">💾 Session Storage</div>
+              <div class="step-desc">
+                DataFrame stored in SessionData (in-RAM): <code>sess.df</code> (standard) or <code>sess.df_a</code>/<code>sess.df_b</code> (variance)<br>
+                Schema stored: <code>sess.schema</code><br>
+                History cleared for this mode (fresh start with new data)<br>
+                Session saved: <code>save_session(sid, sess)</code> → stays in memory until restart
+              </div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">4</div>
+            <div class="step-content">
+              <div class="step-title">📤 Response to Browser</div>
+              <div class="step-desc">
+                Python returns: success, shape (rows × cols), schema, insights (starter questions, profile, anomalies)<br>
+                .NET relays to browser<br>
+                Browser: Shows file name, shape, schema pills, starter question chips, profile card, nudges
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <h2>Question Flow (The Main Pipeline)</h2>
+        <div class="flow-diagram">
+          <div class="flow-box">❓ User Question</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box">.NET /ask</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box">🐍 Python /api/ask</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box">🔐 Auth Envelope</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box">🧠 Pipeline</div>
+        </div>
+
+        <div class="pipeline">
+          <div class="pipeline-step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <div class="step-title">🔐 Authentication Envelope</div>
+              <div class="step-desc">
+                <code>_resolve_user_context(username, session)</code>:<br>
+                • Look up user in database by username (from X-User header)<br>
+                • Decrypt their API key (Fernet)<br>
+                • Check session for user's model preference → fall back to admin default<br>
+                • Returns: (user, api_key, model_name) or error response<br>
+                <br>
+                <code>request_context.begin(api_key, model_name)</code> → sets thread-local context<br>
+                Config.py will now serve this user's key + model to llm.py
+              </div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <div class="step-title">🧠 Two-Call Pipeline (Core)</div>
+              <div class="step-desc">
+                <code>_ask_pipeline(sid, sess, question, mode)</code>:<br>
+                • Load session → get DataFrame(s), schema, history<br>
+                • Build Call 1 messages → <code>llm.generate_query_code()</code> → pandas code<br>
+                • <code>executor.execute_generated_code()</code> → run code, get result<br>
+                • If error → inject error → retry Call 1 once<br>
+                • Build Call 2 messages → <code>llm.generate_human_answer()</code> → JSON (answer + chart)<br>
+                • Parse JSON → extract answer + chart spec<br>
+                • Store result in session (for export + refine)
+              </div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <div class="step-title">📊 Usage Tracking</div>
+              <div class="step-desc">
+                Throughout the pipeline, <code>usage_capture.py</code> intercepts LLM responses via proxy.<br>
+                Copies token counts into <code>request_context.usage_records</code> list.<br>
+                <br>
+                After pipeline completes: <code>usage_capture.flush(user_id, username, sid, request_id, mode, question)</code><br>
+                • For each record: calculate cost using model-specific pricing<br>
+                • Write to UsageLog table: tokens, cost, call type, model, timestamp, success
+              </div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">4</div>
+            <div class="step-content">
+              <div class="step-title">📤 Response to Browser</div>
+              <div class="step-desc">
+                Python returns: <code>{"answer": "...", "chart": {...}, "debug": [...]}</code><br>
+                .NET relays to browser<br>
+                Browser: Displays answer, renders chart (Chart.js), adds to transcript, enables refine/export actions
+              </div>
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-num">5</div>
+            <div class="step-content">
+              <div class="step-title">🧹 Cleanup</div>
+              <div class="step-desc">
+                <code>request_context.end(ctx_tokens)</code> → clears thread-local context<br>
+                Next request will set its own context (different user, different key/model)
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 6: Rollout Features -->
+      <div class="tab-content">
+        <h2>Rollout Batch Features (Production-Ready)</h2>
+        <p>These features were added in three rollout batches to make the app enterprise-ready.</p>
+
+        <h3>🔐 Batch 1: Per-User Keys, Usage Tracking, Admin</h3>
+        <div class="feature-box">
+          <div class="fb-title">What It Adds</div>
+          <ul>
+            <li><strong>Per-User API Keys:</strong> Every user stores their OWN LiteLLM key (Fernet encrypted in chatdata.db). Blocking onboarding modal if no key set.</li>
+            <li><strong>Usage Tracking:</strong> Every LLM call logged: tokens, cost (model-specific pricing), call type, timestamp, success flag. Written to UsageLog table via usage_capture proxy.</li>
+            <li><strong>My Usage Dashboard:</strong> Total questions, tokens, cost, avg cost per question. Chart over time (last 30 days). History table (last 20 questions).</li>
+            <li><strong>Admin Dashboard:</strong> All users aggregated. Top users by cost. Usage by model. All users list with last login.</li>
+            <li><strong>Global Model Selection:</strong> Admin changes default model for all new sessions. Change log tracked (who changed, when, reason).</li>
+            <li><strong>Identity:</strong> X-User from .NET (Windows Auth username or dev fallback). ADMIN_USERS env var.</li>
+            <li><strong>Optional Security:</strong> INTERNAL_API_SECRET for .NET ↔ Python authentication (when on different machines).</li>
+          </ul>
+        </div>
+
+        <div class="feature-box">
+          <div class="fb-title">Mechanism (Golden Rule Preserved)</div>
+          <ul>
+            <li><strong>Request context:</strong> Per-request API key + model set via contextvars (thread-safe)</li>
+            <li><strong>Config.py:</strong> Dynamic properties read from request_context, fall back to env vars</li>
+            <li><strong>llm.py:</strong> Unchanged — still reads Config.LITELLM_API_KEY and Config.LLM_MODEL</li>
+            <li><strong>Usage capture:</strong> Proxy pattern — swaps requests library reference, intercepts responses, extracts tokens</li>
+          </ul>
+        </div>
+
+        <h3>📊 Batch 2: Data Experts (Admin-Published Datasets)</h3>
+        <div class="feature-box">
+          <div class="fb-title">What It Adds</div>
+          <ul>
+            <li><strong>Experts:</strong> Admins upload datasets (CSV/Excel) → publish with label, description, access control</li>
+            <li><strong>Access Control:</strong> Public (all users) OR restricted (specific users OR AD groups)</li>
+            <li><strong>Recommended Questions:</strong> Admin writes up to 6 starter questions → become user's chips</li>
+            <li><strong>Loading:</strong> Files stored in python-service/datasets/ (gitignored). Loaded via EXACT upload path (disk shim) → pipeline untouched.</li>
+            <li><strong>UI:</strong> Left sidebar shows available experts. Click to load → acts like file upload (same flow).</li>
+            <li><strong>Groups:</strong> X-User-Groups header from .NET (AD groups from Windows badge). Auth:DevGroups simulates in dev.</li>
+          </ul>
+        </div>
+
+        <h3>⚡ Batch 3: Live Data Sources (Azure + SQL Server)</h3>
+        <div class="feature-box">
+          <div class="fb-title">What It Adds</div>
+          <ul>
+            <li><strong>Query-backed experts:</strong> Source = Azure blobs (parquet/csv/xlsx) OR SQL Server/Azure SQL</li>
+            <li><strong>Azure blobs:</strong> Downloaded with app's Entra service principal (AZURE_TENANT_ID/CLIENT_ID/CLIENT_SECRET). Admin's SQL runs locally in DuckDB (blobs as tables named by aliases).</li>
+            <li><strong>SQL Server:</strong> DATABASE runs the SQL. Windows auth = service's own identity (gMSA, no stored password) OR SQL login (Fernet-encrypted).</li>
+            <li><strong>Fetched live:</strong> Every time expert is loaded (not cached). Result fed as CSV bytes through SAME _handle_upload shim → pipeline untouched.</li>
+            <li><strong>Guards:</strong> DATASOURCE_MAX_ROWS (500k) + the 50 MB working cap. Header shows "⚡ Azure integrated" badge when live expert visible.</li>
+            <li><strong>Admin form:</strong> Source picker (file/azure_blob/sql_server), connection config, SQL query, Test query button (executes once before save).</li>
+          </ul>
+        </div>
+
+        <div class="feature-box">
+          <div class="fb-title">Implementation Notes</div>
+          <ul>
+            <li><strong>Lazy imports:</strong> services/data_sources.py imports duckdb/azure/pyodbc only when needed. Service runs without them installed (file mode).</li>
+            <li><strong>Not yet tested:</strong> Against real Azure account or SQL Server (needs credentials from ITS).</li>
+            <li><strong>ITS asks:</strong> Two new egress destinations for batch 3 (Azure Storage, Azure SQL). See ROLLOUT_FEATURES.md.</li>
+          </ul>
+        </div>
+
+        <h3>🎛️ Session-Based Model Selection (This Session)</h3>
+        <div class="feature-box">
+          <div class="fb-title">What We Added Today</div>
+          <ul>
+            <li><strong>User model preference:</strong> Stored in session.user_model_preference (in-RAM, session-scoped)</li>
+            <li><strong>Dropdown in header:</strong> 4 verified working models with pricing (hardcoded in HTML)</li>
+            <li><strong>Badge:</strong> Shows active model (e.g., "🤖 GPT-5.4") — always visible, even for admin default</li>
+            <li><strong>Endpoints:</strong> POST /api/user/set_model, GET /api/user/get_model (lightweight check)</li>
+            <li><strong>Flow:</strong> User changes dropdown → saves to session → next /api/ask uses that model</li>
+            <li><strong>Fallback:</strong> If no user preference → uses admin default. Session restart → reverts to default.</li>
+            <li><strong>Models:</strong> Only 4 models that exist in GA gateway with exact pricing (claude-sonnet-4-5, gpt-5.4, gpt-4o, gpt-5.1)</li>
+          </ul>
+        </div>
+
+        <h3>🔧 Prompt Engineering Improvements (This Session)</h3>
+        <div class="feature-box">
+          <div class="fb-title">What We Added</div>
+          <ul>
+            <li><strong>Planning guidance:</strong> For complex multi-step operations, plan before coding. Break into 2-3 clear steps with descriptive variable names.</li>
+            <li><strong>Code length target:</strong> Aim for under 100 lines. Use intermediate DataFrames for readability.</li>
+            <li><strong>Syntax validation:</strong> Explicitly ensure all string literals, parentheses, and brackets are properly closed.</li>
+            <li><strong>Enhanced JSON parsing:</strong> Strip GPT prefixes ("Here's the answer:"), remove markdown fences, extract JSON cleanly.</li>
+            <li><strong>Force JSON mode:</strong> For GPT/o1 models, set response_format: {"type": "json_object"} in API call (ensures valid JSON at source).</li>
+          </ul>
+        </div>
+
+        <div class="feature-box">
+          <div class="fb-title">Impact</div>
+          <ul>
+            <li><strong>Reduces code gen failures:</strong> Complex queries more reliable (planning + syntax checks)</li>
+            <li><strong>Charts work across all models:</strong> Enhanced parser + JSON mode = no more "Could not parse" warnings</li>
+            <li><strong>Non-intrusive:</strong> Changes are in prompts (infrastructure) and llm.py (infrastructure pattern — parse/force_json). Golden rule preserved.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showTab(index) {
+      const tabs = document.querySelectorAll('.tab');
+      const contents = document.querySelectorAll('.tab-content');
+
+      tabs.forEach((tab, i) => {
+        if (i === index) {
+          tab.classList.add('active');
+          contents[i].classList.add('active');
+        } else {
+          tab.classList.remove('active');
+          contents[i].classList.remove('active');
+        }
+      });
+    }
+  </script>
+</body>
+</html>

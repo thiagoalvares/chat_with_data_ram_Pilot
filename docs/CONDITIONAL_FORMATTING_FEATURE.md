@@ -270,7 +270,7 @@ Result: [Red, Green, Yellow, Red, Green, Yellow, Green, Red]
 
 ---
 
-## Phase 2: LLM-Enhanced Formatting (PLANNED)
+## Phase 2: LLM-Enhanced Formatting (IMPLEMENTED)
 
 ### Approach
 
@@ -342,11 +342,19 @@ Optional formatting field (only include if user requests highlighting/coloring):
 
 ### Testing Strategy for Phase 2
 
-1. Implement Phase 2 on separate branch
-2. Test with/without formatting requests
-3. Verify Phase 1 still works when Phase 2 rules absent
-4. Ensure LLM rules override heuristics when conflicting
-5. Test parsing failures (LLM returns malformed rules) → graceful fallback
+✅ **Phase 2 is now implemented**. Test cases:
+
+1. ✅ No formatting keywords → heuristics only, no LLM rules
+2. ✅ User says "highlight Sales below 1000 in red" → LLM generates rule + applies it
+3. ✅ Multiple rules → all applied correctly
+4. ✅ Column mismatch → log warning, skip rule, export succeeds
+5. ✅ Malformed rules → gracefully skip invalid rules
+6. ✅ LLM rules override heuristics when they conflict
+
+**Example prompts that trigger LLM formatting:**
+- "Show me sales and highlight anything below $1M in red"
+- "Display revenue and flag values under 500k in red"
+- "Show profits and color negative values in red and positive in green"
 
 ---
 

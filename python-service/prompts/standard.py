@@ -102,6 +102,58 @@ Rules for the chart field:
 - Chart types available: bar, line, pie, donut, scatter, stacked_bar, multiline.
 - Datasets must contain only plain numbers in the data array — no strings.
 
+Optional formatting field (include ONLY when user explicitly requests highlighting/coloring):
+- Omit the "formatting" field entirely unless user mentions: "highlight", "color", "red", "yellow", "green", "warn", "flag", etc.
+- When user requests highlighting, add a "formatting" field with color rules.
+- Format: {"formatting": {"rules": [...], "row_level": true/false}}
+- Column names must match EXACTLY as they appear in the data result.
+- Maximum 10 rules to avoid complexity.
+
+Rule types supported:
+
+1. NUMERIC CONDITIONS:
+   {"column": "Sales", "condition": "<|>|<=|>=|==|!=", "value": 1000000, "color": "red"}
+
+2. TEXT CONDITIONS:
+   {"column": "Owner", "condition": "==|!=|contains|startswith|endswith", "value": "Thiago Alvares", "color": "yellow"}
+   - Use "==" for exact match (case-insensitive)
+   - Use "contains" for substring search
+
+3. NULL/EMPTY:
+   {"column": "Email", "condition": "is_null", "color": "red"}
+   {"column": "Description", "condition": "is_not_null", "color": "green"}
+
+4. DATE CONDITIONS:
+   {"column": "DueDate", "condition": "<|>|<=|>=|==", "value": "2024-01-01", "color": "red"}
+   - Dates as YYYY-MM-DD strings
+   - Supports: before (<), after (>), on (==)
+
+5. TOP/BOTTOM N:
+   {"column": "Revenue", "condition": "top_n", "value": 5, "color": "green"}
+   {"column": "Score", "condition": "bottom_n", "value": 3, "color": "red"}
+
+6. CROSS-COLUMN:
+   {"column": "Actual", "condition": ">", "compare_column": "Budget", "color": "red"}
+   - Compares two columns: Actual > Budget
+
+7. MULTIPLE CONDITIONS (AND):
+   {"conditions": [
+     {"column": "Status", "condition": "==", "value": "Failed"},
+     {"column": "Priority", "condition": "==", "value": "High"}
+   ], "operator": "and", "color": "red"}
+
+Row-level highlighting:
+- Set "row_level": true to highlight entire row instead of just the cell
+- Example: {"formatting": {"rules": [...], "row_level": true}}
+
+Colors: "red", "yellow", "green" (Excel standard)
+
+Examples:
+{"answer": "...", "chart": null, "formatting": {"rules": [{"column": "Sales", "condition": "<", "value": 1000000, "color": "red"}]}}
+{"answer": "...", "chart": null, "formatting": {"rules": [{"column": "Owner", "condition": "==", "value": "Thiago Alvares", "color": "yellow"}], "row_level": true}}
+
+If user does not request highlighting, omit "formatting" entirely - just return: {"answer": "...", "chart": null}
+
 REMINDER: Return ONLY the JSON object. No markdown fences. No extra text."""
 
     messages = [{"role": "system", "content": system}]

@@ -384,8 +384,8 @@
     <div class="mode-section">
       <div class="section-label">Analysis Mode</div>
       <div class="mode-tabs">
-        <button class="mode-tab active" data-mode="standard"  onclick="switchMode('standard')">Standard</button>
-        <button class="mode-tab"        data-mode="variance"  onclick="switchMode('variance')">Variance</button>
+        <button class="mode-tab active" data-mode="standard"  onclick="switchMode('standard')" title="Analyze a single dataset with questions and answers">Standard</button>
+        <button class="mode-tab"        data-mode="variance"  onclick="switchMode('variance')" title="Compare two datasets to find differences and variances">Variance</button>
       </div>
     </div>
 
@@ -399,13 +399,13 @@
           <select class="key-input" id="expert-select" onchange="expertSelectionChanged()"
                   style="font-family:var(--inter);font-size:0.74rem;padding:0.45rem 0.6rem"></select>
           <div class="slot-hint" id="expert-desc" style="display:block;margin:0.35rem 0 0.5rem"></div>
-          <button class="btn-primary-sm" style="width:100%" onclick="loadSelectedExpert()">Load this expert</button>
+          <button class="btn-primary-sm" style="width:100%" onclick="loadSelectedExpert()" title="Load the selected Data Expert dataset into your session">Load this expert</button>
           <div class="upload-status" id="status-expert"></div>
         </div>
         <div class="sidebar-section">
           <div class="section-label">Data File</div>
           <div class="upload-slot">
-            <div class="upload-zone" id="zone-standard">
+            <div class="upload-zone" id="zone-standard" title="Upload a CSV or Excel file to analyze (click or drag and drop)">
               <input type="file" id="file-standard" accept=".csv,.xlsx,.xls"/>
               <div class="upload-icon">📂</div>
               <div class="upload-text">CSV or XLSX — drop or click</div>
@@ -432,9 +432,9 @@
         <div class="sidebar-section">
           <div class="section-label">Dataset A — Baseline</div>
           <div class="upload-slot">
-            <input class="label-input" id="label-a" type="text" placeholder="Label (e.g. Budget, Jan 2025)" value="Baseline"/>
+            <input class="label-input" id="label-a" type="text" placeholder="Label (e.g. Budget, Jan 2025)" value="Baseline" title="Enter a custom label for this dataset (e.g., 'Budget 2025')"/>
             <div class="slot-hint" id="hint-a" style="display:none"></div>
-            <div class="upload-zone" id="zone-a">
+            <div class="upload-zone" id="zone-a" title="Upload your baseline/original dataset to compare against">
               <input type="file" id="file-a" accept=".csv,.xlsx,.xls"/>
               <div class="upload-icon">📂</div>
               <div class="upload-text">CSV or XLSX</div>
@@ -445,9 +445,9 @@
         <div class="sidebar-section">
           <div class="section-label">Dataset B — Current</div>
           <div class="upload-slot">
-            <input class="label-input" id="label-b" type="text" placeholder="Label (e.g. Actuals, Feb 2025)" value="Current"/>
+            <input class="label-input" id="label-b" type="text" placeholder="Label (e.g. Actuals, Feb 2025)" value="Current" title="Enter a custom label for this dataset (e.g., 'Actuals 2025')"/>
             <div class="slot-hint" id="hint-b" style="display:none"></div>
-            <div class="upload-zone" id="zone-b">
+            <div class="upload-zone" id="zone-b" title="Upload your current/new dataset to compare with baseline">
               <input type="file" id="file-b" accept=".csv,.xlsx,.xls"/>
               <div class="upload-icon">📂</div>
               <div class="upload-text">CSV or XLSX</div>
@@ -460,7 +460,7 @@
       <!-- Options (always visible) -->
       <div class="sidebar-section">
         <div class="section-label">Options</div>
-        <label class="debug-toggle" id="debug-toggle">
+        <label class="debug-toggle" id="debug-toggle" title="Show the Python code and calculations used to generate each answer">
           <div class="toggle-track" id="toggle-track"><div class="toggle-knob"></div></div>
           Show Query and Calculations
         </label>
@@ -480,8 +480,8 @@
       </div>
       <div class="header-actions">
         <div class="view-tabs">
-          <button class="view-tab active" id="view-tab-chat" onclick="showView('chat')">Chat</button>
-          <button class="view-tab" id="view-tab-dash" onclick="showView('dashboard')">Dashboard</button>
+          <button class="view-tab active" id="view-tab-chat" onclick="showView('chat')" title="View conversation with questions and answers">Chat</button>
+          <button class="view-tab" id="view-tab-dash" onclick="showView('dashboard')" title="View pinned answers in a dashboard layout">Dashboard</button>
         </div>
         <select class="model-select" id="model-select" onchange="changeModel()" title="Select AI model">
           <option value="claude-sonnet-4-5">Claude Sonnet 4.5 ($3 / $15)</option>
@@ -494,7 +494,7 @@
         <button class="icon-btn" onclick="showSettingsModal()" title="Settings (API key)">⚙</button>
         <button class="icon-btn" id="admin-btn" onclick="showAdminDashboard()" title="Admin dashboard" style="display:none">🛡</button>
         <button class="icon-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle dark mode">◐</button>
-        <button class="btn-ghost" onclick="clearChat()">Clear Chat</button>
+        <button class="btn-ghost" onclick="clearChat()" title="Clear the current conversation (option to export first)">Clear Chat</button>
       </div>
     </div>
 
@@ -518,8 +518,8 @@
           <button class="icon-btn" id="hist-btn" onclick="toggleHistory()" title="Recent questions">↺</button>
           <div class="hist-pop" id="hist-pop"></div>
         </div>
-        <textarea id="question-input" placeholder="Ask a question about your data..." rows="1" disabled></textarea>
-        <button class="send-btn" id="send-btn" onclick="sendQuestion()" disabled>Send</button>
+        <textarea id="question-input" placeholder="Ask a question about your data..." rows="1" disabled title="Type your question here (Enter to send, Shift+Enter for new line)"></textarea>
+        <button class="send-btn" id="send-btn" onclick="sendQuestion()" disabled title="Send your question to get an AI-generated answer">Send</button>
       </div>
       <div class="input-hint" id="input-hint">Enter to send · Shift+Enter for new line</div>
     </div>
@@ -532,7 +532,7 @@
     <div class="modal-title">Select Sheet</div>
     <div class="modal-sub">This file has multiple sheets. Which one would you like to load?</div>
     <div id="sheet-buttons"></div>
-    <span class="modal-cancel" onclick="closeSheetModal()">Cancel</span>
+    <span class="modal-cancel" onclick="closeSheetModal()" title="Close this dialog without selecting a sheet">Cancel</span>
   </div>
 </div>
 
@@ -762,7 +762,7 @@ function detectDateFromFilename(fn) {
 function showSheetModal(sheets) {
   const btns = document.getElementById('sheet-buttons');
   btns.innerHTML = sheets.map(s =>
-    `<button class="sheet-btn" onclick="selectSheet('${esc(s)}')">${esc(s)}</button>`
+    `<button class="sheet-btn" onclick="selectSheet('${esc(s)}')" title="Load sheet: ${esc(s)}">${esc(s)}</button>`
   ).join('');
   document.getElementById('sheet-modal').classList.add('open');
 }
@@ -834,7 +834,7 @@ function renderTranscript(mode) {
     const c = document.createElement('div');
     c.className = 'chips-bar';
     c.innerHTML = modeSuggestions[mode].map(s =>
-      `<button class="chip" onclick="askChip(this.textContent)">${esc(s)}</button>`).join('');
+      `<button class="chip" onclick="askChip(this.textContent)" title="Click to ask: ${esc(s)}">${esc(s)}</button>`).join('');
     body.appendChild(c);
   }
 
@@ -897,6 +897,7 @@ async function sendQuestion() {
       id: ++msgCounter, role: 'assistant',
       content: d.error ? '⚠ ' + d.error : d.answer,
       debugItems: d.debug || [], chartSpec: d.chart || null,
+      formatting: d.formatting || null,
       question, error: !!d.error,
     });
   } catch (e) {
@@ -942,11 +943,11 @@ function renderEntry(entry, isLastAnswer) {
       <div class="chart-canvas-wrap"><canvas id="${chartId}"></canvas></div>
       <div class="chart-actions">
         <span class="chart-type-btns" id="tb-${chartId}">
-          <button data-t="bar"  onclick="switchChartType('${chartId}','bar')">Bar</button>
-          <button data-t="line" onclick="switchChartType('${chartId}','line')">Line</button>
-          ${single ? `<button data-t="pie" onclick="switchChartType('${chartId}','pie')">Pie</button>` : ''}
+          <button data-t="bar"  onclick="switchChartType('${chartId}','bar')" title="Display as bar chart">Bar</button>
+          <button data-t="line" onclick="switchChartType('${chartId}','line')" title="Display as line chart">Line</button>
+          ${single ? `<button data-t="pie" onclick="switchChartType('${chartId}','pie')" title="Display as pie chart">Pie</button>` : ''}
         </span>
-        <button class="btn-export" onclick="exportChart('${chartId}', '${esc(entry.chartSpec.title || 'chart')}')">↓ Export PNG</button>
+        <button class="btn-export" onclick="exportChart('${chartId}', '${esc(entry.chartSpec.title || 'chart')}')" title="Download this chart as a PNG image">↓ Export PNG</button>
       </div>`;
     div.querySelector('.msg-bubble').appendChild(chartEl);
     chartSpecs[chartId] = Object.assign({}, entry.chartSpec);
@@ -970,7 +971,7 @@ function renderEntry(entry, isLastAnswer) {
 
     const exportBtn = document.createElement('div');
     exportBtn.className = 'export-actions';
-    exportBtn.innerHTML = `<button class="btn-export-excel" onclick="exportToExcel()">↓ Export to Excel</button>`;
+    exportBtn.innerHTML = `<button class="btn-export-excel" onclick="exportToExcel()" title="Download the last query result as an Excel file with conditional formatting">↓ Export to Excel</button>`;
     div.querySelector('.msg-bubble').appendChild(exportBtn);
   }
 
@@ -996,6 +997,12 @@ function renderEntry(entry, isLastAnswer) {
   }
 
   body.appendChild(div);
+
+  // Apply conditional formatting to tables (Phase 2 - comprehensive)
+  if (role === 'assistant' && entry.formatting) {
+    setTimeout(() => applyTableFormatting(div, entry.formatting), 50);
+  }
+
   body.scrollTop = body.scrollHeight;
   return div;
 }
@@ -1196,6 +1203,282 @@ async function exportDebugResult() {
   } catch (e) {
     alert('Export failed: ' + e.message);
   }
+}
+
+// ── Conditional Formatting for Chat Tables (Phase 2 - Comprehensive) ─────────
+function applyTableFormatting(messageElement, formatting) {
+  if (!formatting || !formatting.rules || formatting.rules.length === 0) return;
+
+  const table = messageElement.querySelector('table');
+  if (!table) return;
+
+  const rowLevel = formatting.row_level || false;
+  const colors = {
+    'red': '#FFC7CE',
+    'yellow': '#FFEB9C',
+    'green': '#C6EFCE'
+  };
+
+  // Get headers and map column names to indices
+  const headerRow = table.querySelector('thead tr') || table.querySelector('tr');
+  if (!headerRow) return;
+
+  const headers = Array.from(headerRow.querySelectorAll('th, td')).map(cell =>
+    cell.textContent.trim()
+  );
+
+  const tbody = table.querySelector('tbody') || table;
+  const rows = Array.from(tbody.querySelectorAll('tr')).filter(row =>
+    row.parentElement.tagName !== 'THEAD' && row !== headerRow
+  );
+
+  // Apply each rule
+  formatting.rules.forEach(rule => {
+    try {
+      // Handle multi-condition rules (AND logic)
+      if (rule.conditions && rule.operator === 'and') {
+        applyMultiConditionRule(rows, headers, rule, colors, rowLevel);
+      } else {
+        applyStandardRule(rows, headers, rule, colors, rowLevel);
+      }
+    } catch (e) {
+      console.warn('Failed to apply formatting rule:', rule, e);
+    }
+  });
+}
+
+function applyStandardRule(rows, headers, rule, colors, rowLevel) {
+  const { column, condition, value, color, compare_column } = rule;
+
+  if (!color || !colors[color]) return;
+
+  // Handle Top/Bottom N
+  if (condition === 'top_n' || condition === 'bottom_n') {
+    applyTopBottomRule(rows, headers, column, condition, value, colors[color], rowLevel);
+    return;
+  }
+
+  // Handle Cross-Column
+  if (compare_column) {
+    applyCrossColumnRule(rows, headers, column, condition, compare_column, colors[color], rowLevel);
+    return;
+  }
+
+  const colIndex = headers.indexOf(column);
+  if (colIndex === -1) return;
+
+  rows.forEach(row => {
+    const cells = row.querySelectorAll('td, th');
+    const cell = cells[colIndex];
+    if (!cell) return;
+
+    const cellValue = cell.textContent.trim();
+    let match = false;
+
+    try {
+      // Null/Empty checks
+      if (condition === 'is_null') {
+        match = !cellValue || cellValue === '';
+      } else if (condition === 'is_not_null') {
+        match = cellValue && cellValue !== '';
+      }
+      // Numeric comparisons
+      else if (['<', '>', '<=', '>=', '==', '!='].includes(condition)) {
+        const numValue = parseFloat(cellValue.replace(/[^0-9.-]/g, ''));
+        const targetValue = parseFloat(value);
+
+        if (!isNaN(numValue) && !isNaN(targetValue)) {
+          // Numeric comparison
+          if (condition === '<') match = numValue < targetValue;
+          else if (condition === '>') match = numValue > targetValue;
+          else if (condition === '<=') match = numValue <= targetValue;
+          else if (condition === '>=') match = numValue >= targetValue;
+          else if (condition === '==') match = numValue === targetValue;
+          else if (condition === '!=') match = numValue !== targetValue;
+        } else {
+          // Text/Date comparison
+          const strValue = cellValue.toLowerCase();
+          const targetStr = String(value).toLowerCase();
+
+          if (condition === '==') match = strValue === targetStr;
+          else if (condition === '!=') match = strValue !== targetStr;
+
+          // Try date comparison
+          try {
+            const dateValue = new Date(cellValue);
+            const targetDate = new Date(value);
+            if (!isNaN(dateValue.getTime()) && !isNaN(targetDate.getTime())) {
+              if (condition === '<') match = dateValue < targetDate;
+              else if (condition === '>') match = dateValue > targetDate;
+              else if (condition === '<=') match = dateValue <= targetDate;
+              else if (condition === '>=') match = dateValue >= targetDate;
+              else if (condition === '==') match = dateValue.getTime() === targetDate.getTime();
+            }
+          } catch (e) {}
+        }
+      }
+      // Text conditions
+      else if (condition === 'contains') {
+        match = cellValue.toLowerCase().includes(String(value).toLowerCase());
+      } else if (condition === 'startswith') {
+        match = cellValue.toLowerCase().startsWith(String(value).toLowerCase());
+      } else if (condition === 'endswith') {
+        match = cellValue.toLowerCase().endsWith(String(value).toLowerCase());
+      }
+
+      if (match) {
+        if (rowLevel) {
+          cells.forEach(c => c.style.backgroundColor = colors[color]);
+        } else {
+          cell.style.backgroundColor = colors[color];
+        }
+      }
+    } catch (e) {
+      console.warn('Error evaluating condition:', e);
+    }
+  });
+}
+
+function applyTopBottomRule(rows, headers, column, condition, n, bgColor, rowLevel) {
+  const colIndex = headers.indexOf(column);
+  if (colIndex === -1) return;
+
+  const count = parseInt(n) || 5;
+
+  // Collect values with row references
+  const values = rows.map((row, idx) => {
+    const cells = row.querySelectorAll('td, th');
+    const cell = cells[colIndex];
+    const value = parseFloat(cell?.textContent.trim().replace(/[^0-9.-]/g, ''));
+    return { value, row, idx, cell, cells };
+  }).filter(item => !isNaN(item.value));
+
+  // Sort and get top/bottom N
+  values.sort((a, b) => condition === 'top_n' ? b.value - a.value : a.value - b.value);
+  const selected = values.slice(0, count);
+
+  // Apply formatting
+  selected.forEach(item => {
+    if (rowLevel) {
+      item.cells.forEach(c => c.style.backgroundColor = bgColor);
+    } else {
+      item.cell.style.backgroundColor = bgColor;
+    }
+  });
+}
+
+function applyCrossColumnRule(rows, headers, column, condition, compareColumn, bgColor, rowLevel) {
+  const colIndex1 = headers.indexOf(column);
+  const colIndex2 = headers.indexOf(compareColumn);
+
+  if (colIndex1 === -1 || colIndex2 === -1) return;
+
+  rows.forEach(row => {
+    const cells = row.querySelectorAll('td, th');
+    const cell1 = cells[colIndex1];
+    const cell2 = cells[colIndex2];
+
+    if (!cell1 || !cell2) return;
+
+    const value1 = parseFloat(cell1.textContent.trim().replace(/[^0-9.-]/g, ''));
+    const value2 = parseFloat(cell2.textContent.trim().replace(/[^0-9.-]/g, ''));
+
+    if (isNaN(value1) || isNaN(value2)) return;
+
+    let match = false;
+    if (condition === '<') match = value1 < value2;
+    else if (condition === '>') match = value1 > value2;
+    else if (condition === '<=') match = value1 <= value2;
+    else if (condition === '>=') match = value1 >= value2;
+    else if (condition === '==') match = value1 === value2;
+    else if (condition === '!=') match = value1 !== value2;
+
+    if (match) {
+      if (rowLevel) {
+        cells.forEach(c => c.style.backgroundColor = bgColor);
+      } else {
+        cell1.style.backgroundColor = bgColor;
+      }
+    }
+  });
+}
+
+function applyMultiConditionRule(rows, headers, rule, colors, rowLevel) {
+  const { conditions, operator, color } = rule;
+  if (!conditions || !color || !colors[color]) return;
+
+  const bgColor = colors[color];
+
+  rows.forEach(row => {
+    const cells = row.querySelectorAll('td, th');
+
+    // Evaluate all conditions for this row
+    const allMatch = conditions.every(cond => {
+      const colIndex = headers.indexOf(cond.column);
+      if (colIndex === -1) return false;
+
+      const cell = cells[colIndex];
+      if (!cell) return false;
+
+      const cellValue = cell.textContent.trim();
+      return evaluateSingleCondition(cellValue, cond.condition, cond.value);
+    });
+
+    if (allMatch && operator === 'and') {
+      if (rowLevel) {
+        cells.forEach(c => c.style.backgroundColor = bgColor);
+      } else {
+        // Highlight first condition's column
+        const firstColIndex = headers.indexOf(conditions[0].column);
+        if (firstColIndex !== -1) {
+          cells[firstColIndex].style.backgroundColor = bgColor;
+        }
+      }
+    }
+  });
+}
+
+function evaluateSingleCondition(cellValue, condition, targetValue) {
+  try {
+    // Null checks
+    if (condition === 'is_null') return !cellValue || cellValue === '';
+    if (condition === 'is_not_null') return cellValue && cellValue !== '';
+
+    // Numeric comparisons
+    if (['<', '>', '<=', '>=', '==', '!='].includes(condition)) {
+      const numValue = parseFloat(cellValue.replace(/[^0-9.-]/g, ''));
+      const targetNum = parseFloat(targetValue);
+
+      if (!isNaN(numValue) && !isNaN(targetNum)) {
+        if (condition === '<') return numValue < targetNum;
+        if (condition === '>') return numValue > targetNum;
+        if (condition === '<=') return numValue <= targetNum;
+        if (condition === '>=') return numValue >= targetNum;
+        if (condition === '==') return numValue === targetNum;
+        if (condition === '!=') return numValue !== targetNum;
+      }
+
+      // Text comparison fallback
+      const strValue = cellValue.toLowerCase();
+      const targetStr = String(targetValue).toLowerCase();
+      if (condition === '==') return strValue === targetStr;
+      if (condition === '!=') return strValue !== targetStr;
+    }
+
+    // Text conditions
+    if (condition === 'contains') {
+      return cellValue.toLowerCase().includes(String(targetValue).toLowerCase());
+    }
+    if (condition === 'startswith') {
+      return cellValue.toLowerCase().startsWith(String(targetValue).toLowerCase());
+    }
+    if (condition === 'endswith') {
+      return cellValue.toLowerCase().endsWith(String(targetValue).toLowerCase());
+    }
+  } catch (e) {
+    console.warn('Error evaluating condition:', e);
+  }
+  return false;
 }
 
 // ── Pin dashboard (session-scoped snapshots) ─────────────────────────────────
