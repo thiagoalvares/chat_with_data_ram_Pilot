@@ -698,10 +698,43 @@
     .icon-btn { background: none; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; font-size: 0.85rem; padding: 0.25rem 0.5rem; color: var(--text2); transition: all 0.12s; }
     .icon-btn:hover { border-color: var(--navy); color: var(--navy); }
 
-    /* Model selector */
-    .model-select { font-family: var(--inter); font-size: 0.66rem; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 0.3rem 0.6rem; cursor: pointer; max-width: 180px; }
-    .model-select:hover { border-color: var(--navy); }
-    .model-select option { background: var(--bg); color: var(--text); }
+    /* Model selector - Modern design */
+    .model-select {
+      font-family: var(--inter);
+      font-size: 0.7rem;
+      font-weight: 500;
+      background: linear-gradient(135deg, rgba(15,108,189,0.08) 0%, rgba(27,58,107,0.08) 100%);
+      color: var(--navy);
+      border: 1.5px solid rgba(15,108,189,0.2);
+      border-radius: 8px;
+      padding: 0.45rem 0.75rem;
+      padding-right: 2rem;
+      cursor: pointer;
+      max-width: 200px;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%230F6CBD' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.6rem center;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 4px rgba(15,108,189,0.08);
+    }
+    .model-select:hover {
+      border-color: var(--navy);
+      background: linear-gradient(135deg, rgba(15,108,189,0.12) 0%, rgba(27,58,107,0.12) 100%);
+      box-shadow: 0 4px 8px rgba(15,108,189,0.12);
+      transform: translateY(-1px);
+    }
+    .model-select:focus {
+      outline: none;
+      border-color: var(--navy);
+      box-shadow: 0 0 0 3px rgba(15,108,189,0.1);
+    }
+    .model-select option {
+      background: var(--bg);
+      color: var(--text);
+      padding: 0.5rem;
+      font-weight: 500;
+    }
 
     /* Dashboard */
     .dash-body { flex: 1; overflow-y: auto; padding: 1.2rem 1.6rem; display: none; }
@@ -995,8 +1028,7 @@
   <main class="main">
     <div class="main-header">
       <div class="header-left">
-        <div class="main-title" id="main-title">No data loaded</div>
-        <div class="mode-badge" id="mode-badge">Standard</div>
+        <!-- main-title and mode-badge removed - cleaner header -->
         <div class="live-badge" id="live-badge" style="display:none" title="This workspace is connected to live corporate data sources"></div>
         <div class="model-badge" id="model-badge" style="display:none" title="Currently using this AI model"></div>
       </div>
@@ -1241,7 +1273,7 @@ async function handleUpload(file, endpoint, statusId, zoneId, label = null) {
 }
 
 function onUploadSuccess(d, endpoint, statusEl, filename) {
-  let msg = `✓ ${d.rows} rows · ${d.cols} cols`;
+  let msg = `✓ ${filename} · ${d.rows} rows · ${d.cols} cols`;
   if (d.encoding) msg += ` · ${d.encoding}`;
   setStatus(statusEl, msg, 'ok');
 
@@ -1299,7 +1331,7 @@ function onUploadSuccess(d, endpoint, statusEl, filename) {
     dataLoaded = modeReady[currentMode];
     document.getElementById('question-input').disabled = !dataLoaded;
     document.getElementById('send-btn').disabled = !dataLoaded;
-    document.getElementById('main-title').textContent = modeTitles[currentMode];
+    // main-title removed - no longer updating
     renderTranscript(currentMode);
   }
 }
@@ -1373,10 +1405,6 @@ function switchMode(mode) {
   document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
   document.querySelectorAll('.mode-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${mode}`));
 
-  const badge = document.getElementById('mode-badge');
-  badge.textContent = MODE_LABELS[mode] || mode;
-  badge.className   = `mode-badge ${mode === 'standard' ? '' : mode}`;
-
   // Handle Agentic AI mode differently
   if (mode === 'agentic') {
     document.querySelector('.layout').classList.add('agentic-active');
@@ -1384,7 +1412,6 @@ function switchMode(mode) {
     document.getElementById('dash-body').style.display = 'none';
     document.getElementById('agentic-body').style.display = 'block';
     document.getElementById('input-area').style.display = 'none';
-    document.getElementById('main-title').textContent = 'Agentic AI';
     document.getElementById('main-header').style.display = 'none'; // Hide main header in agentic mode
 
     // Check if user is admin to enable input
@@ -1402,7 +1429,7 @@ function switchMode(mode) {
 
   // v2 tab-switch fix: each tab keeps its own conversation on screen.
   // Re-render this tab's transcript instead of wiping the display.
-  document.getElementById('main-title').textContent = modeTitles[mode];
+
   dataLoaded = modeReady[mode];
   document.getElementById('question-input').disabled = !dataLoaded;
   document.getElementById('send-btn').disabled = !dataLoaded || isThinking;
@@ -2692,7 +2719,7 @@ function initImsUpload() {
       document.getElementById('ims-file-info').textContent =
         `${d.filename} — ${d.rows.toLocaleString()} tasks, ${d.cols} fields`;
       document.getElementById('ims-run-section').style.display = 'block';
-      document.getElementById('main-title').textContent = d.filename;
+      // main-title removed - no longer updating
 
     } catch (err) {
       setStatus(statusEl, '✗ ' + err.message, 'err');
@@ -3609,7 +3636,7 @@ function updateVarianceTitle() {
   });
   modeTitles.variance = labels.length > 0 ? labels.join(' + ') : 'Variance Analysis';
   if (currentMode === 'variance') {
-    document.getElementById('main-title').textContent = modeTitles.variance;
+    // main-title removed - no longer updating
   }
 }
 
