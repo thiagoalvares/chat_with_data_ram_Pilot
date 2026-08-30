@@ -677,8 +677,14 @@ def _detect_analysis_mode(sess) -> str:
             logger.info(f"Mode detection: linking (schema similarity {similarity:.0%} < 80%)")
             return "linking"
 
-    # Default to variance for 2-file traditional use case
-    logger.info("Mode detection: variance (default for 2 files)")
+    # Two files that are NOT in slots A+B (e.g., slots 1 & 3): the classic
+    # variance path is hard-wired to df_a/df_b, so route any other pair to
+    # linking mode, which gathers whichever slots are loaded.
+    if len(uploaded_slots) == 2:
+        logger.info(f"Mode detection: linking (2 files in slots {uploaded_slots}, not A+B)")
+        return "linking"
+
+    logger.info("Mode detection: variance (default)")
     return "variance"
 
 
