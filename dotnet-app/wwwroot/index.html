@@ -1378,6 +1378,25 @@ async function exportDebugResult() {
 }
 
 // ── Conditional Formatting for Chat Tables (Phase 2 - Comprehensive) ─────────
+/* ═══════════════════════════════════════════════════════════════════════════
+   FORMATTING RULES CONTRACT — TWIN ENGINES, KEEP IN SYNC
+   This engine colors the chat tables. Its twin in python-service/app.py
+   (_apply_llm_formatting + helpers) colors Excel exports from the SAME rules.
+   Any change to rule semantics here MUST be mirrored there, and vice versa.
+
+   Rule types (text case-insensitive, currency/commas stripped on numbers):
+     1. numeric    {column, condition: <,>,<=,>=,==,!=, value, color}
+     2. text       {column, condition: ==,!=,contains,startswith,endswith, value, color}
+     3. null       {column, condition: is_null|is_not_null, color}
+     4. date       numeric conditions with a YYYY-MM-DD value (fallback after number/text)
+     5. top/bottom {column, condition: top_n|bottom_n, value: N, color}
+     6. cross-col  {column, condition, compare_column, color}
+     7. multi-AND  {conditions: [...], operator: "and", color}
+   Plus: {row_level: true} colors the whole row. Colors: red|yellow|green.
+
+   Known accepted nuances: Excel top_n includes ties (may color more than N);
+   chat colors exactly N. Chat is_null sees rendered text, Excel real cells.
+   ═══════════════════════════════════════════════════════════════════════════ */
 function applyTableFormatting(messageElement, formatting) {
   if (!formatting || !formatting.rules || formatting.rules.length === 0) return;
 

@@ -1090,6 +1090,56 @@ def _apply_conditional_formatting(worksheet, df):
         # Continue with export - user gets plain Excel if formatting fails
 
 
+def _num(value):
+    """
+    Parse a cell value as a number the same way the chat-side engine does:
+    plain numbers first, then with currency symbols / commas / % stripped
+    ("$1,234.56" -> 1234.56). Returns None when not numeric (e.g. dates).
+    """
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        pass
+    import re as _re
+    cleaned = _re.sub(r"[^0-9.\-]", "", str(value))
+    try:
+        return float(cleaned) if cleaned else None
+    except ValueError:
+        return None
+
+
+def _clean_numeric_series(series):
+    """Vectorized version of _num for whole columns (top_n / cross-column)."""
+    numeric = pd.to_numeric(series, errors="coerce")
+    if numeric.isna().all():
+        numeric = pd.to_numeric(
+            series.astype(str).str.replace(r"[^0-9.\-]", "", regex=True),
+            errors="coerce")
+    return numeric
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# FORMATTING RULES CONTRACT — TWIN ENGINES, KEEP IN SYNC
+# This engine colors Excel exports. Its twin in dotnet-app/wwwroot/index.html
+# (applyTableFormatting + helpers) colors the chat tables from the SAME rules.
+# Any change to rule semantics here MUST be mirrored there, and vice versa.
+#
+# Rule types (all case-insensitive on text, currency/commas stripped on numbers):
+#   1. numeric   {"column", "condition": <,>,<=,>=,==,!=, "value", "color"}
+#   2. text      {"column", "condition": ==,!=,contains,startswith,endswith, "value", "color"}
+#   3. null      {"column", "condition": is_null|is_not_null, "color"}
+#   4. date      numeric conditions with a YYYY-MM-DD "value" (falls back after number/text)
+#   5. top/bottom{"column", "condition": top_n|bottom_n, "value": N, "color"}
+#   6. cross-col {"column", "condition", "compare_column", "color"}
+#   7. multi-AND {"conditions": [...], "operator": "and", "color"}
+# Plus: {"row_level": true} colors the whole row. Colors: red|yellow|green.
+#
+# Known accepted nuances (documented, not bugs): Excel top_n includes ties
+# (may color more than N); chat colors exactly N. Chat is_null sees rendered
+# text, Excel sees real empty cells.
+# ════════════════════════════════════════════════════════════════════════════
 def _apply_llm_formatting(worksheet, df, formatting_rules):
     """
     Apply user-requested formatting rules from LLM Call 2 response.
@@ -1196,10 +1246,12 @@ def _apply_standard_rule(worksheet, df, column, condition, value, fill, row_leve
 
             # Numeric conditions
             if condition in ["<", ">", "<=", ">=", "==", "!="]:
-                # Try numeric first
+                # Try numeric first (currency/commas stripped, like the chat engine)
                 try:
-                    num_value = float(cell_value) if cell_value is not None else None
-                    target_value = float(value) if value is not None else None
+                    num_value = _num(cell_value)
+                    target_value = _num(value)
+                    if num_value is None or target_value is None:
+                        raise ValueError("not numeric")
                     if num_value is not None and target_value is not None:
                         if condition == "<" and num_value < target_value:
                             match = True
@@ -1295,7 +1347,7 @@ def _apply_top_bottom_rule(worksheet, df, column, condition, n, fill, row_level)
     except:
         n = 5
 
-    col_data = pd.to_numeric(df[column], errors='coerce')
+    col_data = _clean_numeric_series(df[column])
 
     if condition == "top_n":
         threshold = col_data.nlargest(n).min()
@@ -1322,8 +1374,8 @@ def _apply_cross_column_rule(worksheet, df, column, condition, compare_column, f
 
     col_idx = df.columns.get_loc(column)
 
-    col1_data = pd.to_numeric(df[column], errors='coerce')
-    col2_data = pd.to_numeric(df[compare_column], errors='coerce')
+    col1_data = _clean_numeric_series(df[column])
+    col2_data = _clean_numeric_series(df[compare_column])
 
     for row_idx in range(2, len(df) + 2):
         df_idx = row_idx - 2
@@ -1402,11 +1454,13 @@ def _apply_multi_condition_rule(worksheet, df, rule, color_map, row_level):
 def _evaluate_single_condition(cell_value, condition, target_value):
     """Evaluate a single condition for multi-condition rules."""
     try:
-        # Numeric
+        # Numeric (currency/commas stripped, like the chat engine)
         if condition in ["<", ">", "<=", ">=", "==", "!="]:
             try:
-                num_val = float(cell_value) if cell_value is not None else None
-                target_num = float(target_value) if target_value is not None else None
+                num_val = _num(cell_value)
+                target_num = _num(target_value)
+                if num_val is None or target_num is None:
+                    raise ValueError("not numeric")
                 if num_val is not None and target_num is not None:
                     if condition == "<": return num_val < target_num
                     elif condition == ">": return num_val > target_num
