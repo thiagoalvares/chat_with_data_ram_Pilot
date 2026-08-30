@@ -66,11 +66,22 @@ Browser ──► .NET front end (ASP.NET Core)  ──HTTP + X-Session-Id──
   calls to Python. No analytical logic. Runs on **:5080**.
 - `python-service/` — Flask REST API (`app.py`). Runs on **:8000**.
 
-### ⚠️ Golden rule — DO NOT change the analytical core
-Byte-for-byte identical to the validated prototype; must stay that way:
-`services/llm.py`, `services/executor.py`, `services/file_handler.py`,
-`prompts/standard.py`, `prompts/variance.py`. Data manipulation is pandas, exactly
-as the prototype. Infrastructure (serving, config) is fair game; the core is not.
+### ⚠️ Golden rule — analytical core v2 baseline (updated Aug 2026)
+Still frozen, byte-for-byte vs the validated prototype:
+`services/executor.py`, `services/file_handler.py`.
+
+DELIBERATELY EXTENDED in Aug 2026 (the CURRENT REPO is the new baseline —
+do NOT "restore" these to the prototype; that would break shipped features):
+- `services/llm.py` — force_json for GPT models; parse_answer_response now
+  returns a 3-tuple (answer, chart, formatting); response content is never
+  logged (privacy).
+- `prompts/standard.py`, `prompts/variance.py` — conditional-formatting
+  instructions + code-quality rules. variance.py's formatting block is
+  appended as a PLAIN string (literal JSON braces crash the f-string).
+- `prompts/linking.py` — NEW: multi-file linking mode.
+
+Any further change to these five files needs explicit approval from Thiago
+plus tests. Data manipulation remains pandas, exactly as the prototype.
 
 ## What differs from the base `chat-with-data-RAM` repo (pilot changes)
 1. `python-service/services/insights.py` — **NEW**: profile / anomalies /
