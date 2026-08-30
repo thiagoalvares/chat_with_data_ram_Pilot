@@ -454,6 +454,12 @@ def upload_variance(slot: str):
     setattr(sess, f"label_{slot}", label)
     result = _handle_upload(request.files.get("file"), slot, sess, request.form.get("sheet_name"))
     if "ok" in result:
+        # Links are file-bound: a new file in this slot invalidates any
+        # accepted joins that referenced the previous file's columns.
+        stale = [h for h in sess.join_hints if slot in (h.get("slot1"), h.get("slot2"))]
+        if stale:
+            sess.join_hints = [h for h in sess.join_hints if h not in stale]
+            logger.info(f"Cleared {len(stale)} join link(s) referencing replaced slot '{slot}'")
         # Analyze join suggestions for multi-file linking (for any slot after the first)
         # This triggers when uploading File 2, 3, or 4
         if slot in ("b", "c", "d"):
@@ -487,6 +493,29 @@ def accept_join():
     logger.info(f"Join accepted | {join_hint['file1']}.{join_hint['column1']} ↔ {join_hint['file2']}.{join_hint['column2']}")
 
     return jsonify({"ok": True, "message": f"Link saved: {join_hint['file1']}.{join_hint['column1']} ↔ {join_hint['file2']}.{join_hint['column2']}"}), 200
+
+
+@api.route("/variance/remove_join", methods=["POST"])
+def remove_join():
+    """Remove one accepted join hint — the ✕ on an active link in the UI."""
+    sid = _sid()
+    sess = get_session(sid)
+    body = request.get_json() or {}
+    slot1, slot2 = body.get("slot1"), body.get("slot2")
+    col1 = (body.get("column1") or "").lower()
+    col2 = (body.get("column2") or "").lower()
+
+    def is_match(h):
+        a = (h.get("slot1"), (h.get("column1") or "").lower(),
+             h.get("slot2"), (h.get("column2") or "").lower())
+        return a == (slot1, col1, slot2, col2) or a == (slot2, col2, slot1, col1)
+
+    before = len(sess.join_hints)
+    sess.join_hints = [h for h in sess.join_hints if not is_match(h)]
+    save_session(sid, sess)
+    removed = before - len(sess.join_hints)
+    logger.info(f"Join removed | sid={sid} | removed={removed}")
+    return jsonify({"ok": True, "removed": removed, "joins": sess.join_hints})
 
 
 @api.route("/variance/set_mode", methods=["POST"])
