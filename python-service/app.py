@@ -276,6 +276,44 @@ def _analyze_join_suggestions(sess, new_slot: str):
 
     new_cols = set(new_df.columns)
 
+    # Value overlap is computed on a SAMPLE of distinct values per column —
+    # plenty to detect a real link, and instant even on 500k-row files
+    # (previously every value of every column pair was compared).
+    SAMPLE = 5000
+    _vals_cache = {}
+
+    def sample_values(slot, df, col):
+        """Up to SAMPLE distinct values of a column, as strings (cached per column)."""
+        key = (slot, col)
+        if key not in _vals_cache:
+            vals = df[col].dropna().unique()[:SAMPLE]
+            _vals_cache[key] = set(map(str, vals))
+        return _vals_cache[key]
+
+    _str_cache = {}
+
+    def str_column(slot, df, col):
+        """Full column as a string Series (cached) for vectorized membership tests."""
+        key = (slot, col)
+        if key not in _str_cache:
+            _str_cache[key] = df[col].dropna().astype(str)
+        return _str_cache[key]
+
+    def value_overlap(slot_a, df_a_, col_a, slot_b, df_b_, col_b):
+        """
+        Estimated share of col_a's sampled distinct values that appear anywhere
+        in col_b. Sampling one side but scanning the full other side keeps this
+        instant on large files AND correct when files are sorted differently.
+        """
+        sample = sample_values(slot_a, df_a_, col_a)
+        if not sample:
+            return 0.0
+        other = str_column(slot_b, df_b_, col_b)
+        if other.empty:
+            return 0.0
+        hits = other[other.isin(sample)].nunique()
+        return hits / len(sample)
+
     # Compare with all other uploaded files
     for other_slot in ["a", "b", "c", "d"]:
         if other_slot == new_slot:
@@ -293,26 +331,31 @@ def _analyze_join_suggestions(sess, new_slot: str):
             for other_col in other_cols:
                 # Exact match
                 if new_col == other_col:
-                    # Calculate value overlap
-                    new_vals = set(new_df[new_col].dropna().astype(str))
-                    other_vals = set(other_df[other_col].dropna().astype(str))
-                    if len(new_vals) > 0 and len(other_vals) > 0:
-                        overlap = len(new_vals & other_vals) / min(len(new_vals), len(other_vals))
-                        if overlap > 0.1:  # At least 10% overlap
-                            priority = (get_column_priority(new_col) + get_column_priority(other_col)) / 2
-                            suggestions.append({
-                                "file1": new_label,
-                                "file2": other_label,
-                                "slot1": new_slot,
-                                "slot2": other_slot,
-                                "column1": new_col,
-                                "column2": other_col,
-                                "confidence": overlap,
-                                "match_type": "exact",
-                                "priority": priority,
-                            })
+                    # Bad join-key types (costs, amounts, dates) are never
+                    # suggested — skip the value scan entirely.
+                    if get_column_priority(new_col) == 0 or get_column_priority(other_col) == 0:
+                        continue
+                    # Estimate value overlap: sampled distinct values of the new
+                    # column, membership-tested against the full other column.
+                    overlap = value_overlap(new_slot, new_df, new_col, other_slot, other_df, other_col)
+                    if overlap > 0.1:  # At least 10% overlap
+                        priority = (get_column_priority(new_col) + get_column_priority(other_col)) / 2
+                        suggestions.append({
+                            "file1": new_label,
+                            "file2": other_label,
+                            "slot1": new_slot,
+                            "slot2": other_slot,
+                            "column1": new_col,
+                            "column2": other_col,
+                            "confidence": overlap,
+                            "match_type": "exact",
+                            "priority": priority,
+                        })
                 # Fuzzy match (only for different column names)
                 elif new_col != other_col:
+                    # Bad join-key types are never suggested — skip early.
+                    if get_column_priority(new_col) == 0 or get_column_priority(other_col) == 0:
+                        continue
                     # Apply abbreviation expansion before fuzzy matching
                     COMMON_ABBREV = {
                         'num': 'number', 'acct': 'account', 'cust': 'customer',
@@ -333,24 +376,21 @@ def _analyze_join_suggestions(sess, new_slot: str):
 
                     similarity = SequenceMatcher(None, new_col_expanded, other_col_expanded).ratio()
                     if similarity > 0.6:  # 60% similarity threshold (lowered from 70%)
-                        # Calculate value overlap
-                        new_vals = set(new_df[new_col].dropna().astype(str))
-                        other_vals = set(other_df[other_col].dropna().astype(str))
-                        if len(new_vals) > 0 and len(other_vals) > 0:
-                            overlap = len(new_vals & other_vals) / min(len(new_vals), len(other_vals))
-                            if overlap > 0.1:
-                                priority = (get_column_priority(new_col) + get_column_priority(other_col)) / 2
-                                suggestions.append({
-                                    "file1": new_label,
-                                    "file2": other_label,
-                                    "slot1": new_slot,
-                                    "slot2": other_slot,
-                                    "column1": new_col,
-                                    "column2": other_col,
-                                    "confidence": overlap * similarity,  # Combined score
-                                    "match_type": "fuzzy",
-                                    "priority": priority,
-                                })
+                        # Estimate value overlap (sampled, vectorized, sort-safe)
+                        overlap = value_overlap(new_slot, new_df, new_col, other_slot, other_df, other_col)
+                        if overlap > 0.1:
+                            priority = (get_column_priority(new_col) + get_column_priority(other_col)) / 2
+                            suggestions.append({
+                                "file1": new_label,
+                                "file2": other_label,
+                                "slot1": new_slot,
+                                "slot2": other_slot,
+                                "column1": new_col,
+                                "column2": other_col,
+                                "confidence": overlap * similarity,  # Combined score
+                                "match_type": "fuzzy",
+                                "priority": priority,
+                            })
 
     # Remove true duplicates (same files + same columns)
     # Keep suggestions that show different file pairings
