@@ -279,6 +279,11 @@
       box-shadow: inset -3px 0 12px rgba(10,22,40,0.06);
       position: relative;
     }
+
+    /* Make main positioning context for agentic body */
+    .main {
+      position: relative;
+    }
     .main::before {
       content: '';
       position: absolute;
@@ -496,6 +501,155 @@
     .mode-panel { display: none; }
     .mode-panel.active { display: block; }
 
+    /* Agentic AI Panel */
+    .agentic-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      padding: 3rem;
+      background:
+        radial-gradient(circle at top, rgba(15,108,189,0.03) 0%, transparent 50%),
+        radial-gradient(circle at bottom, rgba(27,58,107,0.03) 0%, transparent 50%),
+        linear-gradient(180deg, #FAFBFC 0%, #FFFFFF 100%);
+    }
+
+    .agentic-greeting {
+      font-family: 'Playfair Display', 'Georgia', serif;
+      font-size: 2.5rem;
+      font-weight: 400;
+      font-style: italic;
+      color: var(--navy);
+      text-align: center;
+      margin-bottom: 3rem;
+      line-height: 1.4;
+      max-width: 700px;
+    }
+
+    .agentic-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--ga-gray, #6C7A89);
+      background: rgba(255,193,7,0.1);
+      border: 1px solid rgba(255,193,7,0.3);
+      padding: 0.5rem 1rem;
+      border-radius: 20px;
+      margin-bottom: 2rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .agentic-input-wrapper {
+      width: 100%;
+      max-width: 700px;
+      position: relative;
+    }
+
+    .agentic-input-area {
+      display: flex;
+      gap: 0.8rem;
+      align-items: flex-end;
+      background: rgba(255,255,255,0.9);
+      padding: 1.2rem;
+      border-radius: 12px;
+      border: 2px solid rgba(27,58,107,0.15);
+      box-shadow:
+        0 4px 16px rgba(10,22,40,0.08),
+        inset 0 1px 2px rgba(255,255,255,0.8);
+      transition: all 0.3s;
+    }
+
+    .agentic-input-area:focus-within {
+      border-color: rgba(15,108,189,0.4);
+      box-shadow:
+        0 6px 24px rgba(15,108,189,0.12),
+        0 0 0 3px rgba(15,108,189,0.08),
+        inset 0 1px 2px rgba(255,255,255,0.9);
+    }
+
+    .agentic-textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-family: var(--inter);
+      font-size: 1rem;
+      padding: 0;
+      resize: none;
+      outline: none;
+      line-height: 1.5;
+      min-height: 24px;
+      max-height: 120px;
+    }
+
+    .agentic-textarea::placeholder {
+      color: var(--silver-lt);
+    }
+
+    .agentic-textarea:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    .agentic-send-btn {
+      background: linear-gradient(135deg, #0F6CBD 0%, #1B3A6B 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0.6rem 1.5rem;
+      font-family: var(--inter);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(15,108,189,0.25);
+    }
+
+    .agentic-send-btn:hover:not(:disabled) {
+      background: linear-gradient(135deg, #1B87E5 0%, #0F6CBD 100%);
+      box-shadow: 0 6px 16px rgba(15,108,189,0.35);
+      transform: translateY(-1px);
+    }
+
+    .agentic-send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .agentic-info {
+      text-align: center;
+      margin-top: 2rem;
+      font-size: 0.85rem;
+      color: var(--silver);
+    }
+
+    /* Adjust layout when agentic is active */
+    .layout.agentic-active {
+      grid-template-columns: 300px 1fr;
+    }
+
+    /* Hide only sidebar body (upload sections), keep logo and tabs */
+    .layout.agentic-active .sidebar-body {
+      display: none;
+    }
+
+    /* Agentic body takes full main area */
+    .agentic-body {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 10;
+    }
+
     /* Sheet selector modal */
     .modal-overlay { position: fixed; inset: 0; background: rgba(10,22,40,0.4); display: none; align-items: center; justify-content: center; z-index: 100; }
     .modal-overlay.open { display: flex; }
@@ -652,6 +806,7 @@
       <div class="mode-tabs">
         <button class="mode-tab active" data-mode="standard"  onclick="switchMode('standard')" title="Analyze a single dataset with questions and answers">Standard</button>
         <button class="mode-tab"        data-mode="variance"  onclick="switchMode('variance')" title="Compare two datasets to find differences and variances">Variance</button>
+        <button class="mode-tab"        data-mode="agentic"   onclick="switchMode('agentic')" title="AI Agent for Power BI semantic models">Agentic AI ✨</button>
       </div>
     </div>
 
@@ -879,6 +1034,39 @@
         <span style="font-size:0.65rem">Pins are snapshots of this session. Export Report saves them for good.</span></div>
     </div>
 
+    <!-- Agentic AI Body -->
+    <div class="agentic-body" id="agentic-body" style="display:none;">
+      <div class="agentic-container">
+        <div class="agentic-greeting">
+          Hello, what would you like to work on today?
+        </div>
+
+        <div class="agentic-badge">
+          🚧 Coming Soon – In Development
+        </div>
+
+        <div class="agentic-input-wrapper">
+          <div class="agentic-input-area">
+            <textarea
+              class="agentic-textarea"
+              id="agentic-input"
+              placeholder="Ask me anything about your data..."
+              rows="1"
+              disabled
+            ></textarea>
+            <button class="agentic-send-btn" id="agentic-send-btn" disabled>
+              Send
+            </button>
+          </div>
+        </div>
+
+        <div class="agentic-info">
+          <p style="margin-bottom:0.5rem;">🤖 <strong>Agentic AI</strong> will perform analytical jobs on your Power BI semantic models, Azure data and other repositories</p>
+          <p style="font-size:0.8rem; opacity:0.7;">Multi-step reasoning • Automatic model selection • Governed measures</p>
+        </div>
+      </div>
+    </div>
+
     <div class="input-area" id="input-area">
       <div class="input-row">
         <div class="hist-wrap">
@@ -921,9 +1109,9 @@ let questionHistory = { standard: [], variance: [] };   // for the ↺ dropdown
 let modeSuggestions = { standard: [], variance: [] };   // starter chips
 let modeAnomalies   = { standard: [], variance: [] };   // "did you notice?"
 let nudgeDismissed  = { standard: false, variance: false };
-let modeTitles      = { standard: 'No data loaded', variance: 'No data loaded' };
-let modeMeta        = { standard: '', variance: '' };
-let modeReady       = { standard: false, variance: false };
+let modeTitles      = { standard: 'No data loaded', variance: 'No data loaded', agentic: 'Agentic AI' };
+let modeMeta        = { standard: '', variance: '', agentic: '' };
+let modeReady       = { standard: false, variance: false, agentic: false };
 let varLoaded       = { a: false, b: false, c: false, d: false };
 let pinned          = [];      // dashboard snapshots {id, question, answer, chartSpec, file, ts}
 let chartSpecs      = {};      // canvasId -> spec (for the type switcher + export)
@@ -931,7 +1119,7 @@ let dashCharts      = [];      // live Chart instances on the dashboard
 let msgCounter      = 0;
 let currentView     = 'chat';
 
-const MODE_LABELS  = { standard: 'Standard', variance: 'Variance', msproject: 'MS Project', ims: 'IMS Health Check' };
+const MODE_LABELS  = { standard: 'Standard', variance: 'Variance', agentic: 'Agentic AI', msproject: 'MS Project', ims: 'IMS Health Check' };
 const MSP_SLOTS    = [
   { key: 'tasks',        label: 'Tasks' },
   { key: 'resources',    label: 'Resources' },
@@ -1186,8 +1374,31 @@ function switchMode(mode) {
   document.querySelectorAll('.mode-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${mode}`));
 
   const badge = document.getElementById('mode-badge');
-  badge.textContent = MODE_LABELS[mode];
+  badge.textContent = MODE_LABELS[mode] || mode;
   badge.className   = `mode-badge ${mode === 'standard' ? '' : mode}`;
+
+  // Handle Agentic AI mode differently
+  if (mode === 'agentic') {
+    document.querySelector('.layout').classList.add('agentic-active');
+    document.getElementById('chat-body').style.display = 'none';
+    document.getElementById('dash-body').style.display = 'none';
+    document.getElementById('agentic-body').style.display = 'block';
+    document.getElementById('input-area').style.display = 'none';
+    document.getElementById('main-title').textContent = 'Agentic AI';
+    document.getElementById('main-header').style.display = 'none'; // Hide main header in agentic mode
+
+    // Check if user is admin to enable input
+    checkAgenticAdminAccess();
+    return;
+  }
+
+  // Standard/Variance modes
+  document.querySelector('.layout').classList.remove('agentic-active');
+  document.getElementById('chat-body').style.display = 'flex';
+  document.getElementById('dash-body').style.display = currentView === 'dashboard' ? 'block' : 'none';
+  document.getElementById('agentic-body').style.display = 'none';
+  document.getElementById('input-area').style.display = 'block';
+  document.getElementById('main-header').style.display = 'flex'; // Show main header
 
   // v2 tab-switch fix: each tab keeps its own conversation on screen.
   // Re-render this tab's transcript instead of wiping the display.
@@ -1197,6 +1408,32 @@ function switchMode(mode) {
   document.getElementById('send-btn').disabled = !dataLoaded || isThinking;
   showView('chat');
   renderTranscript(mode);
+}
+
+// Check if current user has admin access for Agentic AI
+function checkAgenticAdminAccess() {
+  // Check if user is admin (this will be set by the backend via X-User header)
+  fetch('/api/user/is_admin', { headers: { 'X-Session-Id': sessionId } })
+    .then(r => r.json())
+    .then(data => {
+      const isAdmin = data.is_admin || false;
+      const agenticInput = document.getElementById('agentic-input');
+      const agenticBtn = document.getElementById('agentic-send-btn');
+
+      if (isAdmin) {
+        agenticInput.disabled = false;
+        agenticBtn.disabled = false;
+        agenticInput.placeholder = 'Ask me anything about your data... (Admin access enabled)';
+      } else {
+        agenticInput.disabled = true;
+        agenticBtn.disabled = true;
+        agenticInput.placeholder = 'Coming soon for all users...';
+      }
+    })
+    .catch(err => {
+      console.log('Admin check not available yet:', err);
+      // Keep disabled by default
+    });
 }
 
 // Rebuild the chat pane for a mode from its stored transcript:
