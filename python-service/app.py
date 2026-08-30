@@ -947,6 +947,11 @@ def _convert_to_dataframe(raw_result) -> pd.DataFrame:
     return pd.DataFrame({"Result": [raw_result]})
 
 
+# Coloring loops run per cell in Python; beyond this many rows the export
+# is delivered plain (instantly) instead of making the user wait minutes.
+FORMATTING_MAX_ROWS = 50000
+
+
 def _apply_conditional_formatting(worksheet, df):
     """
     Apply smart conditional formatting to Excel worksheet based on heuristics.
@@ -986,9 +991,12 @@ def _apply_conditional_formatting(worksheet, df):
         worksheet: openpyxl worksheet object
         df: pandas DataFrame being exported
     """
+    if len(df) > FORMATTING_MAX_ROWS:
+        logger.info(f"Skipping auto-formatting: {len(df):,} rows exceeds the {FORMATTING_MAX_ROWS:,}-row limit")
+        return
+
     try:
         from openpyxl.styles import PatternFill
-        from openpyxl.utils import get_column_letter
 
         # Excel standard colors (subtle, professional)
         green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")    # Light green
@@ -1013,14 +1021,13 @@ def _apply_conditional_formatting(worksheet, df):
         logger.info(f"Applying conditional formatting to {len(df.columns)} columns, {len(df)} rows")
 
         for col_idx, col_name in enumerate(df.columns):
-            col_letter = get_column_letter(col_idx + 1)
             col_name_lower = str(col_name).lower()
 
             # RULE 1: Status/Health Columns
             if any(keyword in col_name_lower for keyword in status_keywords):
                 logger.debug(f"Applying status formatting to column '{col_name}'")
                 for row_idx in range(2, len(df) + 2):  # Skip header row (row 1)
-                    cell = worksheet[f"{col_letter}{row_idx}"]
+                    cell = worksheet.cell(row=row_idx, column=col_idx + 1)
                     value_str = str(cell.value).lower().strip() if cell.value is not None else ""
 
                     if value_str in pass_values:
@@ -1041,7 +1048,7 @@ def _apply_conditional_formatting(worksheet, df):
                     continue
                 logger.debug(f"Applying percentage formatting to column '{col_name}'")
                 for row_idx in range(2, len(df) + 2):
-                    cell = worksheet[f"{col_letter}{row_idx}"]
+                    cell = worksheet.cell(row=row_idx, column=col_idx + 1)
                     try:
                         # Handle both "85%" and 0.85 formats
                         value = cell.value
@@ -1115,10 +1122,12 @@ def _apply_llm_formatting(worksheet, df, formatting_rules):
     if not rules:
         return
 
+    if len(df) > FORMATTING_MAX_ROWS:
+        logger.info(f"Skipping requested formatting: {len(df):,} rows exceeds the {FORMATTING_MAX_ROWS:,}-row limit")
+        return
+
     try:
         from openpyxl.styles import PatternFill
-        from openpyxl.utils import get_column_letter
-        from datetime import datetime
 
         # Same color scheme as heuristics
         green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
@@ -1172,18 +1181,14 @@ def _apply_llm_formatting(worksheet, df, formatting_rules):
 
 def _apply_standard_rule(worksheet, df, column, condition, value, fill, row_level):
     """Apply standard single-column condition (numeric, text, date)."""
-    from openpyxl.utils import get_column_letter
-    from datetime import datetime
-
     if column not in df.columns:
         logger.warning(f"Column '{column}' not found")
         return
 
     col_idx = df.columns.get_loc(column)
-    col_letter = get_column_letter(col_idx + 1)
 
     for row_idx in range(2, len(df) + 2):  # Skip header
-        cell = worksheet[f"{col_letter}{row_idx}"]
+        cell = worksheet.cell(row=row_idx, column=col_idx + 1)
         cell_value = cell.value
 
         try:
@@ -1256,17 +1261,14 @@ def _apply_standard_rule(worksheet, df, column, condition, value, fill, row_leve
 
 def _apply_null_rule(worksheet, df, column, condition, fill, row_level):
     """Apply null/empty check."""
-    from openpyxl.utils import get_column_letter
-
     if column not in df.columns:
         logger.warning(f"Column '{column}' not found")
         return
 
     col_idx = df.columns.get_loc(column)
-    col_letter = get_column_letter(col_idx + 1)
 
     for row_idx in range(2, len(df) + 2):
-        cell = worksheet[f"{col_letter}{row_idx}"]
+        cell = worksheet.cell(row=row_idx, column=col_idx + 1)
         cell_value = cell.value
 
         match = False
@@ -1284,8 +1286,6 @@ def _apply_null_rule(worksheet, df, column, condition, fill, row_level):
 
 def _apply_top_bottom_rule(worksheet, df, column, condition, n, fill, row_level):
     """Apply top N or bottom N highlighting."""
-    from openpyxl.utils import get_column_letter
-
     if column not in df.columns:
         logger.warning(f"Column '{column}' not found")
         return
@@ -1305,27 +1305,22 @@ def _apply_top_bottom_rule(worksheet, df, column, condition, n, fill, row_level)
         matching_rows = df[col_data <= threshold].index
 
     col_idx = df.columns.get_loc(column)
-    col_letter = get_column_letter(col_idx + 1)
 
     for idx in matching_rows:
         row_idx = idx + 2  # +2 for header and 0-indexing
         if row_level:
             _highlight_row(worksheet, row_idx, len(df.columns), fill)
         else:
-            cell = worksheet[f"{col_letter}{row_idx}"]
-            cell.fill = fill
+            worksheet.cell(row=row_idx, column=col_idx + 1).fill = fill
 
 
 def _apply_cross_column_rule(worksheet, df, column, condition, compare_column, fill, row_level):
     """Apply cross-column comparison."""
-    from openpyxl.utils import get_column_letter
-
     if column not in df.columns or compare_column not in df.columns:
         logger.warning(f"Column '{column}' or '{compare_column}' not found")
         return
 
     col_idx = df.columns.get_loc(column)
-    col_letter = get_column_letter(col_idx + 1)
 
     col1_data = pd.to_numeric(df[column], errors='coerce')
     col2_data = pd.to_numeric(df[compare_column], errors='coerce')
@@ -1356,8 +1351,7 @@ def _apply_cross_column_rule(worksheet, df, column, condition, compare_column, f
             if row_level:
                 _highlight_row(worksheet, row_idx, len(df.columns), fill)
             else:
-                cell = worksheet[f"{col_letter}{row_idx}"]
-                cell.fill = fill
+                worksheet.cell(row=row_idx, column=col_idx + 1).fill = fill
 
 
 def _apply_multi_condition_rule(worksheet, df, rule, color_map, row_level):
@@ -1399,13 +1393,10 @@ def _apply_multi_condition_rule(worksheet, df, rule, color_map, row_level):
                 _highlight_row(worksheet, row_idx, len(df.columns), fill)
             else:
                 # Highlight first column of the multi-condition
-                from openpyxl.utils import get_column_letter
                 first_col = conditions[0].get("column")
                 if first_col in df.columns:
                     col_idx = df.columns.get_loc(first_col)
-                    col_letter = get_column_letter(col_idx + 1)
-                    cell = worksheet[f"{col_letter}{row_idx}"]
-                    cell.fill = fill
+                    worksheet.cell(row=row_idx, column=col_idx + 1).fill = fill
 
 
 def _evaluate_single_condition(cell_value, condition, target_value):
@@ -1452,11 +1443,8 @@ def _evaluate_single_condition(cell_value, condition, target_value):
 
 def _highlight_row(worksheet, row_idx, num_cols, fill):
     """Highlight entire row."""
-    from openpyxl.utils import get_column_letter
     for col_idx in range(1, num_cols + 1):
-        col_letter = get_column_letter(col_idx)
-        cell = worksheet[f"{col_letter}{row_idx}"]
-        cell.fill = fill
+        worksheet.cell(row=row_idx, column=col_idx).fill = fill
 
 
 @api.route("/export/last_result", methods=["GET"])
