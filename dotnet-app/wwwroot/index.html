@@ -1129,7 +1129,7 @@ function renderEntry(entry, isLastAnswer) {
           <button data-t="line" onclick="switchChartType('${chartId}','line')" title="Display as line chart">Line</button>
           ${single ? `<button data-t="pie" onclick="switchChartType('${chartId}','pie')" title="Display as pie chart">Pie</button>` : ''}
         </span>
-        <button class="btn-export" onclick="exportChart('${chartId}', '${esc(entry.chartSpec.title || 'chart')}')" title="Download this chart as a PNG image">↓ Export PNG</button>
+        <button class="btn-export" onclick="exportChart('${chartId}')" title="Download this chart as a PNG image">↓ Export PNG</button>
       </div>`;
     div.querySelector('.msg-bubble').appendChild(chartEl);
     chartSpecs[chartId] = Object.assign({}, entry.chartSpec);
@@ -1337,6 +1337,9 @@ function renderChart(canvasId, spec) {
 function exportChart(canvasId, title) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
+  // Title is looked up here rather than inlined into the onclick attribute,
+  // so model-generated titles never enter an HTML/JS string context.
+  title = title || (chartSpecs[canvasId] && chartSpecs[canvasId].title) || 'chart';
   const a    = document.createElement('a');
   a.href     = canvas.toDataURL('image/png');
   a.download = `${title.replace(/\s+/g, '_')}.png`;
@@ -1856,6 +1859,10 @@ function renderPreview(columns, rows) {
 
 // ── Markdown renderer ─────────────────────────────────────────────────────────
 function renderMarkdown(text) {
+  // Escape ALL HTML first — answer text is model output over user data and
+  // must never reach innerHTML unescaped. The markdown transforms below then
+  // add back only the tags this function itself generates.
+  text = esc(text);
   // Tables
   text = text.replace(/(\|.+\|\n?)+/g, match => {
     const rows = match.trim().split('\n').filter(r => r.includes('|'));
@@ -2202,7 +2209,7 @@ function autoResize() {
 }
 
 function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 // ── IMS Health Check ──────────────────────────────────────────────────────────
@@ -3164,7 +3171,7 @@ function showSchemaPreview(slot, columns) {
   if (!contentEl || !previewEl) return;
 
   // Build column list
-  const colList = columns.map(c => `<div>${c.name} <span style="color: var(--text3);">(${c.type})</span></div>`).join('');
+  const colList = columns.map(c => `<div>${esc(c.name)} <span style="color: var(--text3);">(${esc(c.type)})</span></div>`).join('');
   contentEl.innerHTML = colList;
 
   // Show preview container
@@ -3172,13 +3179,17 @@ function showSchemaPreview(slot, columns) {
   previewEl.style.display = 'block';
 }
 
+let _joinSuggestions = [];   // acceptJoin looks suggestions up by index — never inline data into onclick attributes
+
 function showJoinSuggestions(suggestions) {
-  // Render join suggestion cards
+  // Render join suggestion cards. File labels are user-typed and column
+  // names come from uploaded files — always esc() before innerHTML.
   const container = document.getElementById('join-suggestions-container');
   const suggestionsEl = document.getElementById('join-suggestions');
 
   if (!container || !suggestionsEl || suggestions.length === 0) return;
 
+  _joinSuggestions = suggestions;
   let html = '';
   suggestions.forEach((sug, idx) => {
     const confidence = Math.round(sug.confidence * 100);
@@ -3187,10 +3198,10 @@ function showJoinSuggestions(suggestions) {
       <div class="join-suggestion" id="join-sug-${idx}">
         <div class="join-suggestion-title">${matchType} — ${confidence}% confidence</div>
         <div class="join-suggestion-details">
-          ${sug.file1}.${sug.column1} ↔ ${sug.file2}.${sug.column2}
+          ${esc(sug.file1)}.${esc(sug.column1)} ↔ ${esc(sug.file2)}.${esc(sug.column2)}
         </div>
         <div class="join-suggestion-actions">
-          <button class="btn-accept-join" onclick="acceptJoin(${idx}, ${JSON.stringify(sug).replace(/"/g, '&quot;')})">✓ Use this link</button>
+          <button class="btn-accept-join" onclick="acceptJoin(${idx})">✓ Use this link</button>
           <button class="btn-reject-join" onclick="rejectJoin(${idx})">Ignore</button>
         </div>
       </div>
@@ -3201,8 +3212,10 @@ function showJoinSuggestions(suggestions) {
   container.style.display = 'block';
 }
 
-async function acceptJoin(idx, suggestion) {
+async function acceptJoin(idx) {
   // User accepted a join suggestion - send to backend
+  const suggestion = _joinSuggestions[idx];
+  if (!suggestion) return;
   try {
     const r = await fetch('/variance/accept_join', {
       method: 'POST',
@@ -3216,7 +3229,7 @@ async function acceptJoin(idx, suggestion) {
       const sugEl = document.getElementById(`join-sug-${idx}`);
       if (sugEl) {
         sugEl.style.background = 'rgba(0,135,90,0.08)';
-        sugEl.innerHTML = `<div style="color: var(--success); font-weight: 500;">✓ ${d.message}</div>`;
+        sugEl.innerHTML = `<div style="color: var(--success); font-weight: 500;">✓ ${esc(d.message)}</div>`;
         setTimeout(() => sugEl.remove(), 3000);
       }
 
