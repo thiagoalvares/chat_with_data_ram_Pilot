@@ -1624,10 +1624,8 @@ def user_set_model():
     body = request.get_json() or {}
     model = body.get("model", "").strip()
 
-    # Allowed models (verified working with exact pricing)
-    ALLOWED_MODELS = [
-        "claude-sonnet-4-5", "gpt-5.4", "gpt-4o", "gpt-5.1"
-    ]
+    # Single source of truth for selectable models: services/pricing.py
+    from services.pricing import ALLOWED_MODEL_NAMES as ALLOWED_MODELS
 
     if not model:
         # Clear user preference (revert to admin default)
@@ -1657,18 +1655,15 @@ def user_get_model():
     current_model = sess.user_model_preference or admin_default
     is_default = sess.user_model_preference is None
 
-    ALLOWED_MODELS = [
-        {"value": "claude-sonnet-4-5", "label": "Claude Sonnet 4.5", "price": "$3 / $15"},
-        {"value": "gpt-5.4", "label": "GPT-5.4", "price": "$2.50 / $15"},
-        {"value": "gpt-4o", "label": "GPT-4o", "price": "$2.50 / $10"},
-        {"value": "gpt-5.1", "label": "GPT-5.1", "price": "$2 / $10"},
-    ]
+    # Labels and price strings derive from services/pricing.py — one place
+    # to edit models and rates.
+    from services.pricing import model_options
 
     return jsonify({
         "current_model": current_model,
         "is_default": is_default,
         "admin_default": admin_default,
-        "available_models": ALLOWED_MODELS
+        "available_models": model_options()
     })
 
 
