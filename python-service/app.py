@@ -548,81 +548,80 @@ def ask():
 
 def _parse_simple_join(question: str, sess) -> list:
     """
-    Extract join hints from natural language patterns in the question.
+    Extract join hints from EXPLICIT linking language in the question.
 
-    Patterns supported:
+    Patterns supported (must use the word "link" or "join"):
     - "Link File 1 CustomerID to File 2 CustID"
-    - "Link CustomerID to CustID"
-    - "CustomerID = CustID"
-    - "Join on AccountNum to AcctID"
+    - "Link CustomerID to CustID" / "Join on AccountNum to AcctID"
+
+    Every parsed column is validated case-insensitively against the real
+    columns of the loaded files and emitted with its true casing; hints
+    naming columns that don't exist are discarded. Plain "A = B" text is
+    deliberately NOT treated as a link — users use equals signs to filter.
 
     Returns list of join hint dicts compatible with linking.py
     """
     import re
 
-    hints = []
-    question_lower = question.lower()
+    def real_column(slot: str, name: str):
+        """Case-insensitive lookup in the slot's DataFrame; returns the true column name or None."""
+        df = getattr(sess, f"df_{slot}", None)
+        if df is None:
+            return None
+        return {str(c).lower(): str(c) for c in df.columns}.get(name.lower())
 
-    # Pattern 1: "Link File X ColumnA to File Y ColumnB"
-    pattern1 = r'link\s+file\s+(\d+)\s+(\w+)\s+to\s+file\s+(\d+)\s+(\w+)'
-    matches = re.findall(pattern1, question_lower, re.IGNORECASE)
-    for match in matches:
-        file1_num, col1, file2_num, col2 = match
-        slot_map = {'1': 'a', '2': 'b', '3': 'c', '4': 'd'}
-        slot1 = slot_map.get(file1_num)
-        slot2 = slot_map.get(file2_num)
-        if slot1 and slot2:
-            label1 = getattr(sess, f"label_{slot1}", f"File {file1_num}")
-            label2 = getattr(sess, f"label_{slot2}", f"File {file2_num}")
-            hints.append({
-                "slot1": slot1,
-                "slot2": slot2,
-                "column1": col1.title(),  # Capitalize
-                "column2": col2.title(),
-                "file1": label1,
-                "file2": label2,
-            })
+    def label(slot: str) -> str:
+        return getattr(sess, f"label_{slot}", f"File {slot.upper()}")
 
-    # Pattern 2: "Link ColumnA to ColumnB" (infer files from context)
-    pattern2 = r'link\s+(\w+)\s+to\s+(\w+)'
-    matches = re.findall(pattern2, question_lower, re.IGNORECASE)
-    for match in matches:
-        col1, col2 = match
-        # Simple heuristic: assume first 2 uploaded files
-        uploaded = [s for s in ['a', 'b', 'c', 'd'] if getattr(sess, f"df_{s}", None) is not None]
-        if len(uploaded) >= 2:
-            slot1, slot2 = uploaded[0], uploaded[1]
-            label1 = getattr(sess, f"label_{slot1}", f"File {slot1.upper()}")
-            label2 = getattr(sess, f"label_{slot2}", f"File {slot2.upper()}")
-            hints.append({
-                "slot1": slot1,
-                "slot2": slot2,
-                "column1": col1.title(),
-                "column2": col2.title(),
-                "file1": label1,
-                "file2": label2,
-            })
+    uploaded = [s for s in ("a", "b", "c", "d") if getattr(sess, f"df_{s}", None) is not None]
+    slot_map = {"1": "a", "2": "b", "3": "c", "4": "d"}
+    hints, seen = [], set()
 
-    # Pattern 3: "ColumnA = ColumnB" or "join on ColumnA to ColumnB"
-    pattern3 = r'(\w+)\s*=\s*(\w+)'
-    matches = re.findall(pattern3, question_lower)
-    for match in matches:
-        col1, col2 = match
-        uploaded = [s for s in ['a', 'b', 'c', 'd'] if getattr(sess, f"df_{s}", None) is not None]
-        if len(uploaded) >= 2:
-            slot1, slot2 = uploaded[0], uploaded[1]
-            label1 = getattr(sess, f"label_{slot1}", f"File {slot1.upper()}")
-            label2 = getattr(sess, f"label_{slot2}", f"File {slot2.upper()}")
-            hints.append({
-                "slot1": slot1,
-                "slot2": slot2,
-                "column1": col1.title(),
-                "column2": col2.title(),
-                "file1": label1,
-                "file2": label2,
-            })
+    def add_hint(slot1: str, slot2: str, col1: str, col2: str):
+        key = (slot1, slot2, col1.lower(), col2.lower())
+        if key in seen:
+            return
+        seen.add(key)
+        hints.append({
+            "slot1": slot1, "slot2": slot2,
+            "column1": col1, "column2": col2,
+            "file1": label(slot1), "file2": label(slot2),
+        })
 
-    logger.info(f"Parsed {len(hints)} join hints from question: {hints}")
+    def find_pair(col1: str, col2: str):
+        """First pair of distinct loaded files where col1 and col2 actually exist."""
+        for s1 in uploaded:
+            for s2 in uploaded:
+                if s1 == s2:
+                    continue
+                r1, r2 = real_column(s1, col1), real_column(s2, col2)
+                if r1 and r2:
+                    return s1, s2, r1, r2
+        return None
+
+    # Pattern 1: "link/join file X ColumnA to file Y ColumnB"
+    pattern1 = r'(?:link|join)\s+file\s+([1-4])\s+(\w+)\s+(?:to|on|with)\s+file\s+([1-4])\s+(\w+)'
+    explicit = re.findall(pattern1, question, re.IGNORECASE)
+    for file1_num, col1, file2_num, col2 in explicit:
+        slot1, slot2 = slot_map[file1_num], slot_map[file2_num]
+        real1, real2 = real_column(slot1, col1), real_column(slot2, col2)
+        if slot1 != slot2 and real1 and real2:
+            add_hint(slot1, slot2, real1, real2)
+
+    # Pattern 2: "link/join ColumnA to ColumnB" (no file numbers) — find the
+    # pair of files where both columns actually exist. Skipped when pattern 1
+    # matched so the same phrase isn't parsed twice.
+    if not explicit:
+        pattern2 = r'(?:link|join)\s+(?:on\s+)?(\w+)\s+(?:to|on|with)\s+(\w+)'
+        for col1, col2 in re.findall(pattern2, question, re.IGNORECASE):
+            if col1.lower() == "file":   # fragment of a malformed pattern-1 phrase
+                continue
+            found = find_pair(col1, col2)
+            if found:
+                add_hint(*found)
+
+    if hints:
+        logger.info(f"Parsed {len(hints)} validated join hints from question: {hints}")
     return hints
 
 
