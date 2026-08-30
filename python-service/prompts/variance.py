@@ -130,7 +130,11 @@ Rules for the chart field:
 - Only include a chart when it genuinely adds value — single numbers do not need charts.
 - Chart types available: bar, line, pie, donut, scatter, stacked_bar, multiline.
 - Datasets must contain only plain numbers in the data array — no strings.
-- When using grouped bars, always use one dataset per file with clear labels.
+- When using grouped bars, always use one dataset per file with clear labels."""
+
+    # Appended as a PLAIN string (not an f-string): the JSON examples below
+    # contain literal braces, which crash an f-string at runtime.
+    system += """
 
 Optional formatting field (include ONLY when user explicitly requests highlighting/coloring):
 - Omit the "formatting" field entirely unless user mentions: "highlight", "color", "red", "yellow", "green", "warn", "flag", etc.
