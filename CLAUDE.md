@@ -3,6 +3,12 @@
 > Auto-loaded by Claude Code. Complete handoff so a fresh Claude instance can
 > understand this project and guide the user (Thiago). Read it fully before acting.
 
+## How to communicate with Thiago
+
+- **Outline style, always**: short bullets, bold lead-ins, one idea per line.
+- **No large paragraphs** — he finds them hard to digest. 1–2 sentences max when prose is needed.
+- Lead with the answer/verdict, then supporting detail.
+
 ## What this project is
 
 **Chat with Data — RAM Pilot.** An AI app that answers plain-English questions
