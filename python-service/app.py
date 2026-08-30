@@ -759,6 +759,7 @@ def _detect_analysis_mode(sess) -> str:
 def _ask_pipeline(sid, sess, question, mode):
     """The original /ask body, moved verbatim (logic identical to the prototype flow)."""
     debug = []
+    analysis_mode = mode  # refined to 'variance'/'linking' below; shown as a badge in the UI
     logger.info(f"Question received | mode={mode} | sid={sid} | q={question[:80]}")
     history = sess.get_history(mode)
 
@@ -853,6 +854,7 @@ def _ask_pipeline(sid, sess, question, mode):
         "chart":  chart,
         "debug":  [{"label": d.label, "content": d.content} for d in debug],
         "formatting": formatting,
+        "analysis_mode": analysis_mode,
     })
 
 

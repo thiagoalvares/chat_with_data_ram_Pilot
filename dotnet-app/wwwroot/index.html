@@ -183,6 +183,7 @@
     .msg-label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.3rem; }
     .msg-user .msg-label      { color: var(--silver); text-align: right; }
     .msg-assistant .msg-label { color: var(--navy-mid); }
+    .mode-badge { margin-left: 0.5rem; padding: 0.1rem 0.45rem; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); color: var(--silver); font-weight: 500; letter-spacing: 0; text-transform: none; }
 
     .msg-bubble { padding: 0.9rem 1.1rem; font-size: 0.84rem; line-height: 1.75; border-radius: 8px; }
     .msg-user .msg-bubble      { background: var(--navy); color: #fff; border-radius: 8px 8px 2px 8px; box-shadow: var(--shadow); text-align: right; }
@@ -1070,6 +1071,7 @@ async function sendQuestion() {
       content: d.error ? '⚠ ' + d.error : d.answer,
       debugItems: d.debug || [], chartSpec: d.chart || null,
       formatting: d.formatting || null,
+      analysisMode: d.analysis_mode || null,
       question, error: !!d.error,
     });
   } catch (e) {
@@ -1099,8 +1101,16 @@ function renderEntry(entry, isLastAnswer) {
   const label  = role === 'user' ? 'You' : 'Assistant';
   const bubble = role === 'assistant' ? renderMarkdown(content) : esc(content);
 
+  // Which brain answered: classic Variance vs multi-file Linked analysis.
+  // Shown so a silent mode switch is never a mystery to the user.
+  const modeBadge = (role === 'assistant' && (entry.analysisMode === 'variance' || entry.analysisMode === 'linking'))
+    ? `<span class="mode-badge" title="${entry.analysisMode === 'linking'
+        ? 'Answered by multi-file linked analysis (files joined on key columns)'
+        : 'Answered by classic two-file variance comparison'}">${entry.analysisMode === 'linking' ? 'Linked analysis' : 'Variance'}</span>`
+    : '';
+
   div.innerHTML = `
-    <div class="msg-label">${label}</div>
+    <div class="msg-label">${label}${modeBadge}</div>
     <div class="msg-bubble">${bubble}</div>
   `;
 
