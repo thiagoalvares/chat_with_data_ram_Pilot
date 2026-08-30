@@ -864,10 +864,15 @@ def ask_refine():
             return jsonify({"error": raw_answer}), 502
 
         answer, chart, formatting = llm_service.parse_answer_response(raw_answer)
-        sess.last_formatting = formatting
-        save_session(sid, sess)
+        # Keep previously requested highlighting unless the refine answer
+        # itself carries new rules — a "one sentence" rephrase must not
+        # silently erase formatting the user asked for earlier.
+        if formatting:
+            sess.last_formatting = formatting
+            save_session(sid, sess)
+        effective_formatting = formatting or getattr(sess, "last_formatting", None)
         logger.info(f"Refine ({style}) | sid={sid} | mode={mode}")
-        return jsonify({"answer": answer, "chart": chart, "formatting": formatting})
+        return jsonify({"answer": answer, "chart": chart, "formatting": effective_formatting})
     finally:
         usage_capture.flush(user["UserID"], username, sid, request_id, mode, question, refine=True)
         request_context.end(ctx_tokens)
