@@ -925,17 +925,16 @@ def _apply_conditional_formatting(worksheet, df):
          - Red: "fail", "error", "critical", "bad", "failed", "rejected"
 
     2. PERCENTAGE COLUMNS:
-       Detects: "%" in column name OR "percent", "pct", "rate" in column name
+       Detects: "%" in column name OR "percent"/"pct" in column name, AND at
+       least 80% of the values inside 0-1 or 0-100. "rate" is deliberately
+       excluded (a finance "rate" is usually dollars, not a percentage).
        Colors:
          - Green: >= 80%
          - Yellow: 50-79%
          - Red: < 50%
 
-    3. NUMERIC SCORE/RATING COLUMNS:
-       Detects: "score", "rating", "priority", "risk" in column name
-       Colors (scale-based):
-         - For "risk" or "priority": High values = Red, Low values = Green (reverse scale)
-         - For "score" or "rating": High values = Green, Low values = Red (normal scale)
+    (Score/risk/priority percentile coloring was removed — arbitrary-scale
+    colors confused users. LLM-requested rules cover those cases on demand.)
 
     Design Notes:
     - Non-intrusive: Only formats columns that match patterns (other columns untouched)
@@ -956,18 +955,20 @@ def _apply_conditional_formatting(worksheet, df):
         yellow_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")   # Light yellow
         red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")      # Light red
 
-        # Status keywords and their mappings
+        # Status keywords and their mappings. Cell values must equal one of
+        # these WHOLE values (case-insensitive) — substring matching used to
+        # color unrelated text (e.g. "compassion" contains "pass").
         status_keywords = ["status", "health", "result", "grade", "check", "outcome"]
-        pass_values = ["pass", "success", "ok", "good", "healthy", "complete", "approved", "yes", "true"]
-        warning_values = ["warning", "caution", "medium", "pending", "review", "moderate"]
-        fail_values = ["fail", "error", "critical", "bad", "failed", "rejected", "no", "false"]
+        pass_values = {"pass", "passed", "success", "successful", "ok", "good", "healthy",
+                       "complete", "completed", "approved", "yes", "true", "on track", "green"}
+        warning_values = {"warning", "caution", "medium", "pending", "in review", "review",
+                          "moderate", "at risk", "yellow"}
+        fail_values = {"fail", "failed", "error", "critical", "bad", "rejected", "no",
+                       "false", "late", "red"}
 
-        # Percentage keywords
-        percentage_keywords = ["percent", "pct", "rate"]
-
-        # Numeric score keywords
-        score_keywords = ["score", "rating"]
-        reverse_score_keywords = ["risk", "priority"]  # High values are bad
+        # Percentage keywords. "rate" is deliberately NOT here — in finance
+        # data a "rate" is usually a dollar rate (labor rate), not a percentage.
+        percentage_keywords = ["percent", "pct"]
 
         logger.info(f"Applying conditional formatting to {len(df.columns)} columns, {len(df)} rows")
 
@@ -982,15 +983,22 @@ def _apply_conditional_formatting(worksheet, df):
                     cell = worksheet[f"{col_letter}{row_idx}"]
                     value_str = str(cell.value).lower().strip() if cell.value is not None else ""
 
-                    if any(pv in value_str for pv in pass_values):
+                    if value_str in pass_values:
                         cell.fill = green_fill
-                    elif any(wv in value_str for wv in warning_values):
+                    elif value_str in warning_values:
                         cell.fill = yellow_fill
-                    elif any(fv in value_str for fv in fail_values):
+                    elif value_str in fail_values:
                         cell.fill = red_fill
 
-            # RULE 2: Percentage Columns
+            # RULE 2: Percentage Columns — the name must look like a percentage
+            # AND the values must actually live in 0-1 or 0-100; otherwise skip
+            # (prevents coloring dollar amounts or variance columns).
             elif "%" in col_name or any(kw in col_name_lower for kw in percentage_keywords):
+                numeric = pd.to_numeric(
+                    df.iloc[:, col_idx].astype(str).str.replace("%", "", regex=False),
+                    errors="coerce").dropna()
+                if len(numeric) == 0 or ((numeric >= 0) & (numeric <= 100)).mean() < 0.8:
+                    continue
                 logger.debug(f"Applying percentage formatting to column '{col_name}'")
                 for row_idx in range(2, len(df) + 2):
                     cell = worksheet[f"{col_letter}{row_idx}"]
@@ -1021,47 +1029,11 @@ def _apply_conditional_formatting(worksheet, df):
                         # Skip cells that can't be converted to numbers
                         continue
 
-            # RULE 3: Numeric Score/Rating Columns
-            elif any(kw in col_name_lower for kw in score_keywords + reverse_score_keywords):
-                logger.debug(f"Applying numeric formatting to column '{col_name}'")
-
-                # Determine if this is a reverse scale (high=bad)
-                is_reverse = any(kw in col_name_lower for kw in reverse_score_keywords)
-
-                # Get column values to calculate thresholds
-                col_values = df.iloc[:, col_idx].dropna()
-                numeric_values = pd.to_numeric(col_values, errors='coerce').dropna()
-
-                if len(numeric_values) > 0:
-                    # Calculate 33rd and 67th percentiles for thresholds
-                    low_threshold = numeric_values.quantile(0.33)
-                    high_threshold = numeric_values.quantile(0.67)
-
-                    for row_idx in range(2, len(df) + 2):
-                        cell = worksheet[f"{col_letter}{row_idx}"]
-                        try:
-                            value = float(cell.value) if cell.value is not None else None
-                            if value is None:
-                                continue
-
-                            if is_reverse:
-                                # Reverse scale: high values = red (bad), low values = green (good)
-                                if value >= high_threshold:
-                                    cell.fill = red_fill
-                                elif value >= low_threshold:
-                                    cell.fill = yellow_fill
-                                else:
-                                    cell.fill = green_fill
-                            else:
-                                # Normal scale: high values = green (good), low values = red (bad)
-                                if value >= high_threshold:
-                                    cell.fill = green_fill
-                                elif value >= low_threshold:
-                                    cell.fill = yellow_fill
-                                else:
-                                    cell.fill = red_fill
-                        except (ValueError, TypeError):
-                            continue
+            # (Former RULE 3 — percentile coloring of score/risk/priority
+            # columns — was removed on purpose: coloring arbitrary thirds of a
+            # numeric scale confused more than it helped. Users who want these
+            # colored can ask in the question, which flows through the
+            # LLM-requested formatting rules instead.)
 
         logger.info("Conditional formatting applied successfully")
 
