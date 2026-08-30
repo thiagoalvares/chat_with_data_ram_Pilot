@@ -137,5 +137,7 @@ def generate_query_code(messages: list) -> Tuple[bool, str]:
 def generate_human_answer(messages: list) -> Tuple[bool, str]:
     """Call 2 — convert result to plain English + optional chart spec."""
     ok, content = _call(messages, temperature=0.3, max_tokens=4096, force_json=True)
-    logger.info(f"Call 2 raw response: {repr(content[:800])}")
+    # PRIVACY: never log the response content — it is the answer over the
+    # user's data, and the app's documented posture is "answers are never
+    # written to disk or logs". Log only size/latency (done in _call).
     return ok, content
