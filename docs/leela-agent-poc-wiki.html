@@ -1,0 +1,489 @@
+<title>Leela Agent PoC</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#F4F6FA; --surface:#FFFFFF; --ink:#1B2430; --muted:#5A6678;
+  --brand:#00267B; --accent:#0066B3; --accent-ink:#0066B3; --accent-soft:#E3EEF7;
+  --border:#D7DEE8; --code-bg:#0E1B33; --code-ink:#D9E4F5; --code-accent:#7FB8E8;
+  --good:#2E7D52; --warn:#A66A14; --warn-soft:#FBF3E3; --good-soft:#E8F4ED;
+  --chip:#EDF2F8;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D131D; --surface:#16202E; --ink:#E6ECF5; --muted:#93A1B5;
+    --brand:#00267B; --accent:#4D9FE0; --accent-ink:#7FB8E8; --accent-soft:#12283C;
+    --border:#263447; --code-bg:#0A1526; --code-ink:#D9E4F5; --code-accent:#7FB8E8;
+    --good:#4CAF82; --warn:#D79A3C; --warn-soft:#2A2313; --good-soft:#12291D;
+    --chip:#1D2A3B;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D131D; --surface:#16202E; --ink:#E6ECF5; --muted:#93A1B5;
+  --brand:#00267B; --accent:#4D9FE0; --accent-ink:#7FB8E8; --accent-soft:#12283C;
+  --border:#263447; --code-bg:#0A1526; --code-ink:#D9E4F5; --code-accent:#7FB8E8;
+  --good:#4CAF82; --warn:#D79A3C; --warn-soft:#2A2313; --good-soft:#12291D;
+  --chip:#1D2A3B;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.65}
+.hero{background:linear-gradient(135deg,#00267B 0%,#01102F 100%);color:#FFFFFF;padding:52px 24px 44px}
+.hero-in{max-width:1060px;margin:0 auto}
+.hero .eyebrow{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#8FB4E8;margin:0 0 10px;font-weight:600}
+.hero h1{margin:0 0 12px;font-size:clamp(28px,4.5vw,42px);font-weight:600;letter-spacing:-.01em;text-wrap:balance}
+.hero p{margin:0;max-width:62ch;color:#C7D6EF;font-size:17px}
+.hero .facts{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+.hero .facts span{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);
+  border-radius:999px;padding:5px 14px;font-size:13px;color:#DCE7F7}
+.tabbar{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border);
+  box-shadow:0 1px 4px rgba(10,25,60,.06)}
+.tabbar-in{max-width:1060px;margin:0 auto;display:flex;gap:4px;overflow-x:auto;padding:0 16px}
+.tab-btn{appearance:none;background:none;border:none;border-bottom:3px solid transparent;
+  padding:14px 18px 11px;font:inherit;font-size:15px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tab-btn:hover{color:var(--ink)}
+.tab-btn:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.tab-btn.on{color:var(--accent-ink);border-bottom-color:var(--accent)}
+main{max-width:1060px;margin:0 auto;padding:36px 20px 80px}
+.panel{display:none}
+.panel.on{display:block}
+h2{font-size:24px;font-weight:600;margin:38px 0 14px;letter-spacing:-.01em}
+h2:first-child{margin-top:0}
+h3{font-size:18px;font-weight:600;margin:28px 0 10px}
+p{max-width:74ch}
+.lede{font-size:17px;color:var(--muted);max-width:76ch}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px 24px;margin:16px 0}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-ink);font-weight:600;margin:0 0 6px}
+.card h3{margin-top:0}
+.card p{font-size:15px;color:var(--muted);margin:8px 0 0}
+pre{background:var(--code-bg);color:var(--code-ink);border-radius:10px;padding:18px 20px;
+  overflow-x:auto;font-family:'IBM Plex Mono','Consolas',monospace;font-size:13.5px;line-height:1.6;margin:14px 0}
+code{font-family:'IBM Plex Mono','Consolas',monospace;font-size:.9em;background:var(--chip);
+  padding:2px 6px;border-radius:5px}
+pre code{background:none;padding:0;font-size:inherit}
+.cm{color:#6E85A8}
+.ck{color:var(--code-accent);font-weight:500}
+table{border-collapse:collapse;width:100%;margin:16px 0;background:var(--surface);
+  border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:14.5px}
+.tblwrap{overflow-x:auto;margin:16px 0}
+.tblwrap table{margin:0}
+th{background:var(--accent-soft);color:var(--accent-ink);text-align:left;padding:10px 14px;
+  font-size:12.5px;letter-spacing:.06em;text-transform:uppercase}
+td{padding:11px 14px;border-top:1px solid var(--border);vertical-align:top}
+td:first-child{white-space:nowrap;font-weight:600}
+.num{font-variant-numeric:tabular-nums}
+.pill{display:inline-block;border-radius:999px;padding:2px 11px;font-size:12.5px;font-weight:600}
+.pill.ok{background:var(--good-soft);color:var(--good)}
+.pill.it{background:var(--warn-soft);color:var(--warn)}
+.pill.b{background:var(--accent-soft);color:var(--accent-ink)}
+ul{padding-left:22px}
+li{margin:6px 0}
+.callout{border-left:4px solid var(--accent);background:var(--accent-soft);border-radius:0 10px 10px 0;
+  padding:14px 20px;margin:18px 0;font-size:15px}
+.callout.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+.callout p{margin:4px 0}
+.diagram{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin:18px 0;overflow-x:auto}
+.diagram svg{display:block;min-width:760px;width:100%;height:auto}
+.flowlist{counter-reset:fl;list-style:none;padding:0;margin:16px 0}
+.flowlist li{counter-increment:fl;position:relative;padding:10px 0 10px 46px;margin:0;border-top:1px solid var(--border)}
+.flowlist li:first-child{border-top:none}
+.flowlist li::before{content:counter(fl);position:absolute;left:0;top:10px;width:28px;height:28px;
+  border-radius:50%;background:var(--brand);color:#fff;font-size:13.5px;font-weight:600;
+  display:flex;align-items:center;justify-content:center}
+:root[data-theme="dark"] .flowlist li::before{background:var(--accent);color:#0A1526}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .flowlist li::before{background:var(--accent);color:#0A1526}}
+.phase{display:grid;grid-template-columns:110px 1fr;gap:18px;padding:20px 0;border-top:1px solid var(--border)}
+.phase:first-of-type{border-top:none}
+.phase .ph{font-weight:600;color:var(--accent-ink);font-size:15px}
+.phase .ph small{display:block;color:var(--muted);font-weight:400;font-size:13px;margin-top:2px}
+.phase h3{margin:0 0 6px;font-size:16.5px}
+.phase ul{margin:6px 0 0;font-size:14.5px}
+@media (max-width:640px){.phase{grid-template-columns:1fr;gap:6px}}
+footer{border-top:1px solid var(--border);color:var(--muted);font-size:13.5px;
+  max-width:1060px;margin:0 auto;padding:20px}
+@media (prefers-reduced-motion:no-preference){.panel.on{animation:fi .2s ease}}
+@keyframes fi{from{opacity:.4}to{opacity:1}}
+</style>
+
+<div class="hero"><div class="hero-in">
+  <p class="eyebrow">Proof of concept · finance AI</p>
+  <h1>Leela Agent PoC</h1>
+  <p>The <strong>Agentic AI ✨ tab is already live</strong> in Chat with Data as a preview — this plan wires
+  its backend: one loop, four tools, three data connections — Power BI semantic models over XMLA,
+  SharePoint documents from the existing Azure sync, and the in-RAM data experts already in
+  production. Every number computed, every step traced.</p>
+  <div class="facts">
+    <span>UI tab shipped — backend is this plan</span>
+    <span>LiteLLM gateway — no new AI infra</span>
+    <span>Zero IT for Power BI (interactive Entra)</span>
+    <span>Reuses existing Blob sync for docs</span>
+    <span>Keyword-first search — exact acronyms</span>
+  </div>
+</div></div>
+
+<nav class="tabbar" aria-label="Sections"><div class="tabbar-in">
+  <button class="tab-btn on" data-t="arch">Architecture</button>
+  <button class="tab-btn" data-t="conn">Connections</button>
+  <button class="tab-btn" data-t="loop">Agent loop</button>
+  <button class="tab-btn" data-t="plan">Development plan</button>
+</div></nav>
+
+<main>
+
+<!-- ══════════════ TAB 1 · ARCHITECTURE ══════════════ -->
+<section class="panel on" id="p-arch">
+<h2>System architecture</h2>
+<p class="lede">The agent is ~200 lines of Python wrapped around LiteLLM calls the app already makes.
+The .NET layer wears a second hat as the DAX bridge (the Power BI client library is .NET-only).
+All thinking happens in the Python service; everything else is pipes.</p>
+
+<div class="diagram">
+<svg viewBox="0 0 900 620" role="img" aria-label="Leela PoC architecture diagram">
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M1 1L9 5L1 9" fill="none" stroke="context-stroke" stroke-width="1.6" stroke-linecap="round"/></marker></defs>
+
+  <rect x="330" y="20" width="240" height="52" rx="9" style="fill:var(--surface);stroke:var(--accent);stroke-width:1.4"/>
+  <text x="450" y="42" text-anchor="middle" style="fill:var(--ink);font-size:15px;font-weight:600">Agentic AI ✨ tab — shipped</text>
+  <text x="450" y="60" text-anchor="middle" style="fill:var(--muted);font-size:12.5px">live preview today · this plan wires it</text>
+
+  <line x1="450" y1="72" x2="450" y2="104" style="stroke:var(--muted)" stroke-width="1.4" marker-end="url(#ah)"/>
+
+  <rect x="180" y="108" width="540" height="86" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.2"/>
+  <text x="200" y="132" style="fill:var(--accent-ink);font-size:13px;font-weight:600;letter-spacing:.08em">.NET FRONT END (ASP.NET CORE)</text>
+  <rect x="200" y="142" width="230" height="40" rx="7" style="fill:var(--surface);stroke:var(--border)"/>
+  <text x="315" y="160" text-anchor="middle" style="fill:var(--ink);font-size:13.5px;font-weight:600">UI proxy</text>
+  <text x="315" y="175" text-anchor="middle" style="fill:var(--muted);font-size:12px">/leela/ask → Python</text>
+  <rect x="470" y="142" width="230" height="40" rx="7" style="fill:var(--surface);stroke:var(--border)"/>
+  <text x="585" y="160" text-anchor="middle" style="fill:var(--ink);font-size:13.5px;font-weight:600">DAX bridge</text>
+  <text x="585" y="175" text-anchor="middle" style="fill:var(--muted);font-size:12px">/internal/dax · AdomdClient</text>
+
+  <line x1="315" y1="194" x2="315" y2="238" style="stroke:var(--muted)" stroke-width="1.4" marker-end="url(#ah)"/>
+
+  <rect x="120" y="242" width="560" height="188" rx="10" style="fill:var(--surface);stroke:var(--brand);stroke-width:1.6"/>
+  <text x="140" y="268" style="fill:var(--accent-ink);font-size:13px;font-weight:600;letter-spacing:.08em">PYTHON SERVICE — THE BRAIN</text>
+  <rect x="140" y="280" width="250" height="44" rx="7" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+  <text x="265" y="298" text-anchor="middle" style="fill:var(--accent-ink);font-size:13.5px;font-weight:600">Agent loop (~200 lines)</text>
+  <text x="265" y="314" text-anchor="middle" style="fill:var(--muted);font-size:12px">choose tool → run → observe → repeat</text>
+
+  <rect x="140" y="340" width="122" height="40" rx="7" style="fill:var(--chip);stroke:var(--border)"/>
+  <text x="201" y="357" text-anchor="middle" style="fill:var(--ink);font-size:12.5px;font-weight:600">run_pandas</text>
+  <text x="201" y="372" text-anchor="middle" style="fill:var(--muted);font-size:11.5px">existing executor</text>
+  <rect x="272" y="340" width="122" height="40" rx="7" style="fill:var(--chip);stroke:var(--border)"/>
+  <text x="333" y="357" text-anchor="middle" style="fill:var(--ink);font-size:12.5px;font-weight:600">query_dax</text>
+  <text x="333" y="372" text-anchor="middle" style="fill:var(--muted);font-size:11.5px">via DAX bridge</text>
+  <rect x="404" y="340" width="122" height="40" rx="7" style="fill:var(--chip);stroke:var(--border)"/>
+  <text x="465" y="357" text-anchor="middle" style="fill:var(--ink);font-size:12.5px;font-weight:600">search_docs</text>
+  <text x="465" y="372" text-anchor="middle" style="fill:var(--muted);font-size:11.5px">FTS5 keyword</text>
+  <rect x="536" y="340" width="128" height="40" rx="7" style="fill:var(--chip);stroke:var(--border)"/>
+  <text x="600" y="357" text-anchor="middle" style="fill:var(--ink);font-size:12.5px;font-weight:600">read_document</text>
+  <text x="600" y="372" text-anchor="middle" style="fill:var(--muted);font-size:11.5px">full text + cite</text>
+
+  <text x="140" y="412" style="fill:var(--muted);font-size:12px">In-RAM DataFrames · session state · usage tracking — unchanged from today</text>
+
+  <rect x="730" y="270" width="150" height="64" rx="9" style="fill:var(--surface);stroke:var(--accent);stroke-width:1.4"/>
+  <text x="805" y="296" text-anchor="middle" style="fill:var(--ink);font-size:13.5px;font-weight:600">LiteLLM gateway</text>
+  <text x="805" y="313" text-anchor="middle" style="fill:var(--muted);font-size:12px">aigateway.ga.com</text>
+  <line x1="682" y1="292" x2="726" y2="292" style="stroke:var(--accent)" stroke-width="1.4" marker-end="url(#ah)"/>
+  <line x1="726" y1="312" x2="682" y2="312" style="stroke:var(--accent)" stroke-width="1.4" marker-end="url(#ah)"/>
+  <text x="704" y="282" text-anchor="middle" style="fill:var(--muted);font-size:11.5px">loop</text>
+
+  <path d="M585 194 L585 216 L760 216 L760 452" fill="none" style="stroke:var(--muted)" stroke-width="1.4" marker-end="url(#ah)"/>
+
+  <rect x="660" y="456" width="200" height="76" rx="9" style="fill:var(--surface);stroke:var(--border);stroke-width:1.2"/>
+  <text x="760" y="480" text-anchor="middle" style="fill:var(--ink);font-size:13.5px;font-weight:600">Power BI workspaces</text>
+  <text x="760" y="497" text-anchor="middle" style="fill:var(--muted);font-size:12px">XMLA · one conn per workspace</text>
+  <text x="760" y="513" text-anchor="middle" style="fill:var(--muted);font-size:12px">registry allowlist routes models</text>
+
+  <path d="M465 380 L465 470 L436 470" fill="none" style="stroke:var(--muted)" stroke-width="1.4" marker-end="url(#ah)"/>
+  <rect x="272" y="446" width="160" height="52" rx="9" style="fill:var(--surface);stroke:var(--border);stroke-width:1.2"/>
+  <text x="352" y="468" text-anchor="middle" style="fill:var(--ink);font-size:13.5px;font-weight:600">SQLite FTS5 index</text>
+  <text x="352" y="485" text-anchor="middle" style="fill:var(--muted);font-size:12px">chunks + SharePoint URLs</text>
+
+  <line x1="268" y1="472" x2="216" y2="472" style="stroke:var(--muted)" stroke-width="1.4" stroke-dasharray="5 4" marker-start="url(#ah)"/>
+  <rect x="40" y="446" width="176" height="76" rx="9" style="fill:var(--surface);stroke:var(--border);stroke-width:1.2"/>
+  <text x="128" y="468" text-anchor="middle" style="fill:var(--ink);font-size:13.5px;font-weight:600">Azure Blob Storage</text>
+  <text x="128" y="485" text-anchor="middle" style="fill:var(--muted);font-size:12px">existing RAG sync jobs</text>
+  <text x="128" y="501" text-anchor="middle" style="fill:var(--muted);font-size:12px">several containers, nightly</text>
+
+  <text x="240" y="460" text-anchor="middle" style="fill:var(--muted);font-size:11.5px">nightly</text>
+  <text x="240" y="474" text-anchor="middle" style="fill:var(--muted);font-size:11.5px">ingest</text>
+
+  <rect x="40" y="546" width="176" height="52" rx="9" style="fill:var(--surface);stroke:var(--border);stroke-width:1.2;stroke-dasharray:5 4"/>
+  <text x="128" y="568" text-anchor="middle" style="fill:var(--muted);font-size:13px;font-weight:600">SharePoint sites</text>
+  <text x="128" y="585" text-anchor="middle" style="fill:var(--muted);font-size:12px">source of truth (upstream)</text>
+  <line x1="128" y1="542" x2="128" y2="526" style="stroke:var(--muted)" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#ah)"/>
+</svg>
+</div>
+
+<div class="callout"><p><strong>Already shipped (Aug 2026):</strong> the <strong>Agentic AI ✨</strong> mode tab is live in
+Chat with Data next to Standard and Variance — full-screen greeting, input area, and a
+"Coming Soon – In Development" badge (commits <code>b35bfcb</code>, <code>ebc8bf1</code>). The input is
+intentionally disabled; this plan builds the backend it will post to, then flips it on.</p></div>
+
+<h2>Runtime flow — one question end to end</h2>
+<ol class="flowlist">
+  <li><strong>Browser → .NET → Python.</strong> The shipped Agentic AI tab posts the question to <code>/leela/ask</code>; the .NET proxy forwards it, same pattern as every existing route.</li>
+  <li><strong>Python → LiteLLM.</strong> The loop sends the conversation plus the tool menu (JSON descriptions of the four functions). The LLM replies with a tool call — never with code that runs anywhere.</li>
+  <li><strong>Python runs the tool.</strong> <code>query_dax</code> calls back to the .NET bridge over localhost; <code>search_docs</code> hits the local FTS5 index; <code>run_pandas</code> uses the untouched golden executor.</li>
+  <li><strong>Result appended, loop repeats.</strong> The LLM sees the result and decides the next step — a different model, a follow-up query, a document lookup — until it has enough.</li>
+  <li><strong>Final answer + trace.</strong> The answer returns with the full step-by-step trace, rendered as a collapsible "How I got this" — the audit trail is the feature.</li>
+</ol>
+
+<div class="callout"><p><strong>The golden rule survives intact.</strong> The LLM orchestrates and narrates;
+deterministic code computes. Every figure in an answer traces to a DAX result, a pandas execution,
+or a quoted document — never the model's memory.</p></div>
+
+<h2>Design decisions locked in</h2>
+<div class="grid2">
+  <div class="card"><p class="kicker">Model strategy</p><h3>Rent the brain, own the context</h3>
+    <p>No custom or fine-tuned model. Knowledge lives in systems; the agent fetches it live with citations. Registries, tools, and permissions are the moat.</p></div>
+  <div class="card"><p class="kicker">Tool tiers</p><h3>Verdict vs. exploration</h3>
+    <p>Verdict tools are pre-built and deterministic (DAX measures, thresholds, checks) — the LLM never writes their logic. Exploration (<code>run_pandas</code>) is freeform but read-only and never produces an official verdict.</p></div>
+  <div class="card"><p class="kicker">Document search</p><h3>Keyword-first, no embeddings</h3>
+    <p>The corpus is acronym-heavy (CDRL, EVMS, WBS) and users complain semantic search misses exact terms. FTS5 exact matching + the agent reformulating queries covers the synonym gap. Embeddings can be added later behind the same tools if miss logs justify it.</p></div>
+  <div class="card"><p class="kicker">Scale path</p><h3>One agent now, specialists later</h3>
+    <p>This is Option B (one loop, many tools). When the tool menu outgrows one context or other teams ship their own agents, it splits into an orchestrator + specialist agents — same loop, nested. Nothing built here is thrown away.</p></div>
+</div>
+</section>
+
+<!-- ══════════════ TAB 2 · CONNECTIONS ══════════════ -->
+<section class="panel" id="p-conn">
+<h2>Connection 1 — Power BI semantic models (XMLA)</h2>
+<p class="lede">Semantic models are Analysis Services models underneath. Premium/Fabric workspaces expose an
+XMLA endpoint — the same connection DAX Studio uses, rebuilt in the app's own .NET layer.</p>
+
+<h3>Scoping facts (what the connection can see)</h3>
+<div class="tblwrap"><table>
+  <tr><th>Question</th><th>Answer</th></tr>
+  <tr><td>Whole tenant?</td><td>No — XMLA is scoped to one workspace per connection string. There is no tenant-wide XMLA view.</td></tr>
+  <tr><td>All models in a workspace?</td><td>Only those the signed-in account has access to (viewer/member with Build).</td></tr>
+  <tr><td>Multiple workspaces?</td><td>Yes — the registry stores a workspace URL per model; the bridge opens the right connection per query. One Entra sign-in covers all of them.</td></tr>
+  <tr><td>Reports or models?</td><td>Models. Reports are visuals; data and measures live in the semantic model. Several reports usually share one model.</td></tr>
+  <tr><td>Tenant-wide inventory?</td><td>Admin REST APIs + Fabric admin role — an IT ask, not needed for the PoC.</td></tr>
+</table></div>
+
+<h3>Model registry — the allowlist and the router</h3>
+<pre><code><span class="cm">// python-service/config/semantic_models.json</span>
+{ "models": [
+  { "id": "program_cost", "name": "Program Cost",
+    "workspace_url": "powerbi://api.powerbi.com/v1.0/myorg/PMO-Analytics",
+    "database": "ProgramCostModel",
+    "description": "Monthly actuals, budget, EAC, variance by program, WBS, cost element.
+                    Use for any cost, budget, variance, or EAC question." },
+  { "id": "ims_metrics", "name": "IMS Metrics",
+    "workspace_url": "powerbi://api.powerbi.com/v1.0/myorg/Scheduling",
+    "database": "IMSModel",
+    "description": "Task status, float, baseline dates, critical path.
+                    Use for any schedule, slip, or milestone question." }
+]}</code></pre>
+<div class="callout"><p><strong>The <code>description</code> field is the routing mechanism.</strong>
+The LLM reads these to pick a model. If routing misbehaves, rewrite the descriptions — not the code.</p></div>
+
+<h3>The .NET bridge</h3>
+<pre><code><span class="cm">// dotnet-app: dotnet add package Microsoft.AnalysisServices.AdomdClient.NetCore.retail.amd64</span>
+app.MapPost(<span class="ck">"/internal/dax"</span>, (DaxRequest req) =&gt; {
+    var q = req.Dax.TrimStart();
+    <span class="cm">// Guardrail: read-only — reject anything that is not EVALUATE/DEFINE</span>
+    if (!q.StartsWith(<span class="ck">"EVALUATE"</span>, OrdinalIgnoreCase) &amp;&amp; !q.StartsWith(<span class="ck">"DEFINE"</span>, OrdinalIgnoreCase))
+        return Results.BadRequest(new { error = <span class="ck">"Only EVALUATE/DEFINE allowed."</span> });
+
+    using var conn = new AdomdConnection($<span class="ck">"Data Source={req.WorkspaceUrl};Initial Catalog={req.Database};"</span>);
+    conn.Open();  <span class="cm">// pops the same Entra sign-in DAX Studio shows — no IT needed</span>
+    using var cmd = conn.CreateCommand(); cmd.CommandText = req.Dax;
+    using var reader = cmd.ExecuteReader();
+    <span class="cm">// read rows, cap at 500, return { columns, rows, truncated }</span>
+});</code></pre>
+<ul>
+  <li><strong>Auth:</strong> interactive Entra sign-in, token cached and silently refreshed. Unattended operation later needs a service principal — the one future IT ask.</li>
+  <li><strong>Security:</strong> bind <code>/internal/dax</code> to localhost or protect with the existing <code>INTERNAL_API_SECRET</code> header. Never browser-reachable.</li>
+  <li><strong>Later nicety:</strong> pool connections per workspace (<code>ConcurrentDictionary</code> keyed by URL) — first query pays ~2s setup, repeats are instant.</li>
+</ul>
+
+<h2>Connection 2 — SharePoint documents (existing Azure sync)</h2>
+<p class="lede">The RAG application's Azure pipelines already sync several SharePoint repositories to
+Blob Storage nightly. Leela reads those containers directly — reusing the sync investment with zero
+dependency on the Mendix tool or team.</p>
+<div class="tblwrap"><table>
+  <tr><th>Piece</th><th>What happens</th></tr>
+  <tr><td>Sync</td><td>Already running — existing Azure jobs land SharePoint files in Blob containers nightly. Nothing to build.</td></tr>
+  <tr><td>Access</td><td>Read-only RBAC on the containers (Storage Blob Data Reader) — a small, one-time ask.</td></tr>
+  <tr><td>Ingest job</td><td>~100 lines, nightly after the sync: list blobs → new/changed only → extract text (pypdf, python-docx) → chunk by heading/page (large chunks; FTS needs no micro-chunks) → index.</td></tr>
+  <tr><td>Index</td><td>SQLite FTS5: one row per chunk with filename, section, modified date, and the original SharePoint URL for citations.</td></tr>
+  <tr><td>Repo registry</td><td>Same pattern as models: allowlisted containers with a description each, so the agent knows which repo covers what.</td></tr>
+</table></div>
+
+<h3>Why keyword search wins here</h3>
+<ul>
+  <li>Embeddings handle acronyms poorly — <code>CDRL</code> is a rare token with weak vector meaning; semantic search returns "related" docs when users wanted <em>that exact term</em>. This is the documented complaint about the current RAG tool.</li>
+  <li>FTS5 gives grep behavior: exact match first, prefix queries (<code>WBS*</code>), title/heading boosting.</li>
+  <li>An acronym glossary in the system prompt lets the agent search both <code>CDRL</code> and its expansion.</li>
+  <li>The agent retries with reformulated queries — the LLM is the synonym engine, closing most of the gap embeddings would.</li>
+  <li>Log every search miss: that log is the future evidence for (or against) adding embeddings behind the same tools.</li>
+</ul>
+
+<h2>Connection 3 — Data experts (already built)</h2>
+<div class="grid2">
+  <div class="card"><p class="kicker">Reused as-is</p><h3>The in-RAM analytical core</h3>
+    <p>Uploaded DataFrames, the two-call pipeline, the executor, per-user keys, and usage tracking all stay byte-for-byte. The executor is simply wrapped as the <code>run_pandas</code> tool.</p></div>
+  <div class="card"><p class="kicker">Expert config</p><h3>Experts become agent context</h3>
+    <p>A data expert = a system-prompt fragment (terminology, thresholds, WBS knowledge) plus a tool list. The finance expert and the scheduling expert can expose different model registries.</p></div>
+</div>
+</section>
+
+<!-- ══════════════ TAB 3 · AGENT LOOP ══════════════ -->
+<section class="panel" id="p-loop">
+<h2>The loop</h2>
+<p class="lede">An agent is a while-loop in your code plus an LLM that picks the next step. The LLM only
+ever returns JSON — a tool name and arguments. Your Python executes everything.</p>
+
+<pre><code><span class="cm"># python-service/services/agent_loop.py</span>
+MAX_STEPS = 12
+
+def run_agent(question, model):
+    messages = [{<span class="ck">"role"</span>: <span class="ck">"system"</span>, <span class="ck">"content"</span>: SYSTEM_PROMPT},
+                {<span class="ck">"role"</span>: <span class="ck">"user"</span>,   <span class="ck">"content"</span>: question}]
+    trace = []
+    for step in range(MAX_STEPS):
+        resp = client.chat.completions.create(model=model, messages=messages, tools=TOOL_DEFS)
+        msg = resp.choices[0].message
+        if not msg.tool_calls:
+            return {<span class="ck">"answer"</span>: msg.content, <span class="ck">"trace"</span>: trace}   <span class="cm"># final answer</span>
+        messages.append(msg)
+        for tc in msg.tool_calls:
+            name, args = tc.function.name, json.loads(tc.function.arguments)
+            try:
+                result = TOOL_IMPL[name](args)
+            except Exception as e:
+                result = json.dumps({<span class="ck">"error"</span>: str(e)})       <span class="cm"># errors fed back — she self-corrects</span>
+            trace.append({<span class="ck">"step"</span>: step, <span class="ck">"tool"</span>: name, <span class="ck">"args"</span>: args})
+            messages.append({<span class="ck">"role"</span>: <span class="ck">"tool"</span>, <span class="ck">"tool_call_id"</span>: tc.id, <span class="ck">"content"</span>: result})
+    return {<span class="ck">"answer"</span>: <span class="ck">"Step limit reached — try a narrower question."</span>, <span class="ck">"trace"</span>: trace}</code></pre>
+
+<h3>Tool menu</h3>
+<div class="tblwrap"><table>
+  <tr><th>Tool</th><th>Backs onto</th><th>Tier</th><th>Description the LLM sees</th></tr>
+  <tr><td><code>list_models</code></td><td>registry JSON</td><td><span class="pill b">routing</span></td><td>"List available semantic models with descriptions. Call FIRST to pick the right model."</td></tr>
+  <tr><td><code>get_model_schema</code></td><td>DAX INFO functions / DMVs</td><td><span class="pill b">routing</span></td><td>"Tables, columns, measures of one model. Call before writing DAX — never guess names."</td></tr>
+  <tr><td><code>query_dax</code></td><td>.NET bridge → XMLA</td><td><span class="pill ok">verdict</span></td><td>"Read-only DAX (EVALUATE only). Prefer existing measures — they are the governed definitions."</td></tr>
+  <tr><td><code>search_docs</code></td><td>SQLite FTS5</td><td><span class="pill b">routing</span></td><td>"Keyword search over SharePoint docs. Exact terms first; retry with synonyms/expansions on a miss."</td></tr>
+  <tr><td><code>read_document</code></td><td>FTS5 store</td><td><span class="pill ok">verdict</span></td><td>"Full text of a document section, with its SharePoint link for citation."</td></tr>
+  <tr><td><code>run_pandas</code></td><td>existing golden executor</td><td><span class="pill it">exploration</span></td><td>"Run pandas on the uploaded session data. Freeform, read-only."</td></tr>
+</table></div>
+
+<h3>System prompt — the rules that make her trustworthy</h3>
+<pre><code>You are Leela, a data analyst.
+1. Route first: list_models / registry descriptions pick the ONE source that fits.
+2. Schema before DAX — never guess table, column, or measure names.
+3. Prefer existing measures over hand-rolled math: measures are the company's
+   governed definitions and must match the dashboards.
+4. Every number in your answer must come from a query result in this conversation.
+   Never estimate or fill in numbers yourself.
+5. Cite documents by their SharePoint link. Quote exact wording for rules.
+6. On errors: read, fix, retry. On repeated misses: reformulate the search.
+7. Final answers state which sources were used.</code></pre>
+
+<h3>Guardrails (all in the PoC)</h3>
+<div class="grid3">
+  <div class="card"><h3>Read-only everywhere</h3><p>DAX bridge rejects non-EVALUATE. Blob access is reader RBAC. Executor writes nothing.</p></div>
+  <div class="card"><h3>Caps</h3><p>12 steps per question · 500 rows per DAX result · request timeouts. No runaways.</p></div>
+  <div class="card"><h3>Full trace</h3><p>Every step logged (tool, args, duration, tokens) into the existing usage-tracking DB, and shown to the user.</p></div>
+  <div class="card"><h3>Allowlists</h3><p>Models and doc repos come only from registries. Access beyond them doesn't exist as far as the agent knows.</p></div>
+  <div class="card"><h3>Errors recycled</h3><p>Tool failures return as data, not crashes — the LLM reads the error and self-corrects.</p></div>
+  <div class="card"><h3>Gateway fallback</h3><p>If the gateway strips the <code>tools</code> param: same loop, prompted JSON protocol instead. One curl test decides.</p></div>
+</div>
+
+<div class="callout warn"><p><strong>Verify first:</strong> one curl to the gateway with a <code>tools</code> payload.
+A <code>tool_calls</code> block in the response = native path. Plain text = use the JSON-protocol fallback —
+everything else in this plan is identical either way.</p></div>
+</section>
+
+<!-- ══════════════ TAB 4 · DEV PLAN ══════════════ -->
+<section class="panel" id="p-plan">
+<h2>Development plan</h2>
+<p class="lede">Six phases, each independently demoable. Order chosen so the only external dependency
+(Blob read access) is requested early but blocks nothing until phase 4.</p>
+
+<div class="phase"><div class="ph">Phase 0<small>½ day</small></div><div>
+  <h3>Verify the ground</h3>
+  <ul><li>Curl the gateway with a <code>tools</code> payload → native vs. fallback decision</li>
+  <li>DAX Studio → connect to both target workspaces; note exact workspace URLs + model names</li>
+  <li>Request read RBAC on the RAG sync Blob containers <span class="pill it">small IT ask — submit now</span></li>
+  <li>Pick the two models and one doc container for the demo</li></ul></div></div>
+
+<div class="phase"><div class="ph">Phase 1<small>1–2 days</small></div><div>
+  <h3>Agent loop core</h3>
+  <ul><li><code>agent_loop.py</code> + tool registry + trace logging (extend the usage-tracking DB)</li>
+  <li>Wrap the existing executor as <code>run_pandas</code> — first working tool, zero new connections</li>
+  <li>Test: multi-step questions on an uploaded file ("is this overrun a one-time thing or a trend?")</li>
+  <li><strong>Demoable:</strong> the loop visibly chaining steps on existing data</li></ul></div></div>
+
+<div class="phase"><div class="ph">Phase 2<small>1–2 days</small></div><div>
+  <h3>Power BI bridge</h3>
+  <ul><li>AdomdClient endpoint with EVALUATE guard + row cap; localhost-only</li>
+  <li>Model registry JSON + <code>list_models</code> / <code>get_model_schema</code> / <code>query_dax</code></li>
+  <li>Test routing: a cost question → workspace A; a schedule question → workspace B</li>
+  <li><strong>Demoable:</strong> answers matching the dashboards, cross-workspace in one conversation</li></ul></div></div>
+
+<div class="phase"><div class="ph">Phase 3<small>1–2 days</small></div><div>
+  <h3>Document search</h3>
+  <ul><li>Blob reader → extract (pypdf/python-docx) → chunk large → FTS5 with SharePoint URLs</li>
+  <li><code>search_docs</code> / <code>read_document</code> + acronym glossary in the system prompt</li>
+  <li>Nightly re-index job scheduled after the existing sync window; log every search miss</li>
+  <li><strong>Demoable:</strong> "what does the CDRL say about…" with exact quote + link</li></ul></div></div>
+
+<div class="phase"><div class="ph">Phase 4<small>½–1 day</small></div><div>
+  <h3>Wire the shipped Agentic AI tab <span class="pill ok">UI shell done</span></h3>
+  <ul><li>The tab, greeting, input area, and styling already exist in production (<code>agentic-body</code> in <code>index.html</code>) — remove <code>disabled</code> from the textarea/send button and drop the Coming Soon badge</li>
+  <li>Hook send → POST <code>/leela/ask</code>; render answer + collapsible "How I got this" trace in the transcript</li>
+  <li>Add the route to the .NET proxy list (<code>Program.cs</code>); runs inside the existing per-user key envelope</li></ul></div></div>
+
+<div class="phase"><div class="ph">Phase 5<small>1 day</small></div><div>
+  <h3>Demo hardening</h3>
+  <ul><li>Run the six-question script below until clean; dry-run the live demo</li>
+  <li>Snapshot step/token/cost stats per question from the trace DB — the economics slide</li></ul></div></div>
+
+<h2>Acceptance test script</h2>
+<div class="tblwrap"><table>
+  <tr><th class="num">#</th><th>Question</th><th>Proves</th></tr>
+  <tr><td class="num">1</td><td>"What data do you have access to?"</td><td>Registry answer only — no queries fired</td></tr>
+  <tr><td class="num">2</td><td>"What was total variance last month?"</td><td>Routes to the cost model, uses the governed measure</td></tr>
+  <tr><td class="num">3</td><td>"How many tasks are on the critical path?"</td><td>Routing switches workspaces correctly</td></tr>
+  <tr><td class="num">4</td><td>"Which WBS is worst, and is it getting worse?"</td><td>Multi-step iteration on one model</td></tr>
+  <tr><td class="num">5</td><td>"Are we over budget on X, and what does the SOW say about overrun reporting?"</td><td>DAX + document search in one conversation — the showstopper</td></tr>
+  <tr><td class="num">6</td><td>"Delete the budget table"</td><td>Read-only guard refuses; answer explains why</td></tr>
+</table></div>
+
+<h2>Risks</h2>
+<div class="tblwrap"><table>
+  <tr><th>Risk</th><th>Mitigation</th></tr>
+  <tr><td>Gateway strips <code>tools</code></td><td>Phase-0 curl decides; JSON-protocol fallback is drop-in, nothing else changes</td></tr>
+  <tr><td>XMLA off on a workspace</td><td>DAX Studio test in phase 0 catches it; pick workspaces that already work</td></tr>
+  <tr><td>Blob RBAC delayed</td><td>Requested day 1; phases 1–2 proceed without it; worst case demo docs from a local folder</td></tr>
+  <tr><td>Token expiry (interactive auth)</td><td>Accepted for PoC — re-sign-in; service principal is the documented production fix</td></tr>
+  <tr><td>Routing picks wrong model</td><td>Fix registry descriptions, not code; trace log shows every routing decision</td></tr>
+</table></div>
+
+<h2>After the PoC</h2>
+<ul>
+  <li><strong>Service principal</strong> for unattended Power BI auth (IT ask #1)</li>
+  <li><strong>Security trimming</strong> for documents — per-user permissions on search results before any company-wide rollout</li>
+  <li><strong>More registries, same loop</strong> — additional workspaces and containers are config, not code</li>
+  <li><strong>Specialist split</strong> — when the tool menu outgrows one context: orchestrator + Power BI agent, docs agent, data-lake agent. Same architecture, nested.</li>
+</ul>
+</section>
+</main>
+
+<footer>Leela Agent PoC · Chat with Data · agent loop over LiteLLM · Power BI XMLA + SharePoint (Azure sync) + in-RAM data experts</footer>
+
+<script>
+document.querySelectorAll('.tab-btn').forEach(function(b){
+  b.addEventListener('click',function(){
+    document.querySelectorAll('.tab-btn').forEach(function(x){x.classList.remove('on')});
+    document.querySelectorAll('.panel').forEach(function(x){x.classList.remove('on')});
+    b.classList.add('on');
+    document.getElementById('p-'+b.dataset.t).classList.add('on');
+    window.scrollTo({top:0});
+  });
+});
+</script>
