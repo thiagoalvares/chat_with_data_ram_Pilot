@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Variance Tab Training Guide - Chat with Data</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --ga-navy: #003057;
+      --ga-blue: #0066B3;
+      --ga-light-blue: #4A90E2;
+      --ga-gray: #6C7A89;
+      --ga-light-gray: #E8EBED;
+      --ga-dark: #1A1A1A;
+      --ga-accent: #00A3E0;
+      --ga-success: #28A745;
+      --ga-warning: #FFC107;
+    }
+
+    body {
+      font-family: 'Segoe UI', 'Arial', sans-serif;
+      background: var(--ga-light-gray);
+      color: var(--ga-dark);
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+      background: white;
+      box-shadow: 0 0 40px rgba(0,0,0,0.1);
+    }
+
+    .header {
+      background: linear-gradient(135deg, var(--ga-navy) 0%, var(--ga-blue) 100%);
+      color: white;
+      padding: 2rem 3rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 4px solid var(--ga-accent);
+    }
+
+    .header-left {
+      flex: 1;
+    }
+
+    .header-left h1 {
+      font-size: 2.2rem;
+      font-weight: 300;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.5px;
+    }
+
+    .header-left .subtitle {
+      font-size: 1rem;
+      opacity: 0.9;
+      font-weight: 300;
+    }
+
+    .logo-container {
+      width: 220px;
+      height: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-container img {
+      max-width: 100%;
+      max-height: 70px;
+      height: auto;
+      object-fit: contain;
+    }
+
+    .meta-info {
+      background: var(--ga-light-gray);
+      padding: 1rem 3rem;
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      color: var(--ga-gray);
+      border-bottom: 1px solid #ddd;
+    }
+
+    .meta-info .item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .meta-info .label {
+      font-weight: 600;
+      color: var(--ga-navy);
+    }
+
+    .tabs {
+      display: flex;
+      background: white;
+      border-bottom: 3px solid var(--ga-navy);
+      overflow-x: auto;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .tab {
+      padding: 1.2rem 2rem;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--ga-gray);
+      transition: all 0.2s;
+      border-bottom: 4px solid transparent;
+      white-space: nowrap;
+      letter-spacing: 0.3px;
+    }
+
+    .tab:hover {
+      background: var(--ga-light-gray);
+      color: var(--ga-navy);
+    }
+
+    .tab.active {
+      color: var(--ga-navy);
+      border-bottom-color: var(--ga-accent);
+      background: white;
+    }
+
+    .content {
+      padding: 3rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.3s;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    h2 {
+      color: var(--ga-navy);
+      font-size: 2rem;
+      font-weight: 300;
+      margin: 2rem 0 1.5rem;
+      padding-bottom: 0.8rem;
+      border-bottom: 3px solid var(--ga-accent);
+    }
+
+    h3 {
+      color: var(--ga-blue);
+      font-size: 1.5rem;
+      font-weight: 400;
+      margin: 2rem 0 1rem;
+    }
+
+    h4 {
+      color: var(--ga-navy);
+      font-size: 1.2rem;
+      font-weight: 500;
+      margin: 1.5rem 0 0.8rem;
+    }
+
+    p {
+      margin-bottom: 1rem;
+      color: var(--ga-dark);
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .feature-card {
+      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      padding: 1.5rem;
+      border-radius: 8px;
+      border-left: 4px solid var(--ga-blue);
+      transition: all 0.3s;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    }
+
+    .feature-card h4 {
+      margin-top: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .feature-card .icon {
+      font-size: 1.5rem;
+    }
+
+    .step-box {
+      background: #f0f8ff;
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin: 1.5rem 0;
+      border-left: 4px solid var(--ga-blue);
+    }
+
+    .step-number {
+      display: inline-block;
+      background: var(--ga-navy);
+      color: white;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 32px;
+      font-weight: bold;
+      margin-right: 0.5rem;
+    }
+
+    .highlight-box {
+      background: #fff8e1;
+      border: 2px solid var(--ga-warning);
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin: 1.5rem 0;
+    }
+
+    .success-box {
+      background: #e8f5e9;
+      border: 2px solid var(--ga-success);
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin: 1.5rem 0;
+    }
+
+    .info-box {
+      background: #e3f2fd;
+      border: 2px solid var(--ga-blue);
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin: 1.5rem 0;
+    }
+
+    ul, ol {
+      margin: 1rem 0 1rem 2rem;
+    }
+
+    li {
+      margin: 0.5rem 0;
+    }
+
+    code {
+      background: #f5f5f5;
+      padding: 0.2rem 0.4rem;
+      border-radius: 3px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 0.9em;
+    }
+
+    .footer {
+      background: var(--ga-navy);
+      color: white;
+      padding: 2rem 3rem;
+      text-align: center;
+      font-size: 0.9rem;
+    }
+
+    .footer p {
+      margin: 0.5rem 0;
+      color: rgba(255,255,255,0.8);
+    }
+
+    @media print {
+      .tabs { position: static; }
+      .tab-content { display: block !important; page-break-before: always; }
+      .tab-content:first-of-type { page-break-before: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-left">
+        <h1>Variance Tab Training Guide</h1>
+        <div class="subtitle">Multi-File Analysis & Smart Linking</div>
+      </div>
+      <div class="logo-container">
+        <img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBxAHBhANBw8QDRAOEQ4SDxAPEBANDQ8OFREWFhYRFhUYHCggGBonJxUVLT0hJTUsLjA6Fx8zODMtNygvLisBCgoKDg0OGhAQGi0iICEtLSstLS0tLS0rLS0tLS0rLS0uLS0tLSstLS0tLS0rLS0tLSsrLS0rLS0tKzItKy0wLf/AABEIAZABkAMBIgACEQEDEQH/xAAcAAEAAgIDAQAAAAAAAAAAAAAABwgBBgIEBQP/xAA0EAACAQMCBAUDBAEEAwEAAAAAAQIDBBEFBiExQWEHEhNRcRQigTJCYpEVJGNyghYjsVL/xAAaAQEAAwEBAQAAAAAAAAAAAAAAAwQFAgEG/8QAJxEBAAICAgICAgICAwAAAAAAAAECAxEEEiExE0EigQWRFKFhYvD/2gAMAwEAAhEDEQA/AItAB9OygAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBxAHBhANBw8QDRAOEQ4SDxAPEBANDQ8OFREWFhYRFhUYHCggGBonJxUVLT0hJTUsLjA6Fx8zODMtNygvLisBCgoKDg0OGhAQGi0iICEtLSstLS0tLS0rLS0tLS0rLS0uLS0tLSstLS0tLS0rLS0tLSsrLS0rLS0tKzItKy0wLf/AABEIAZABkAMBIgACEQEDEQH/xAAcAAEAAgIDAQAAAAAAAAAAAAAABwgBBgIEBQP/xAA0EAACAQMCBAUDBAEEAwEAAAAAAQIDBBEFBiExQWEHEhNRcRUigTJCYpEVJGNyghYjsVL/xAAaAQEAAwEBAQAAAAAAAAAAAAAAAwQFAgEG/8QAJxEBAAICAgICAgICAwAAAAAAAAECAxEEEiExE0EigQWRFKFhYvD/2gAMAwEAAhEDEQA/AItAB9OygAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/Z" alt="General Atomics Aeronautical Systems, Inc." />
+      </div>
+    </div>
+
+    <div class="meta-info">
+      <div class="item">
+        <span class="label">Version:</span>
+        <span>2.0</span>
+      </div>
+      <div class="item">
+        <span class="label">Document Type:</span>
+        <span>User Training Guide</span>
+      </div>
+      <div class="item">
+        <span class="label">Last Updated:</span>
+        <span>August 2026</span>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('overview')">Overview</button>
+      <button class="tab" onclick="showTab('interface')">Interface Guide</button>
+      <button class="tab" onclick="showTab('features')">Key Features</button>
+      <button class="tab" onclick="showTab('training')">Hands-On Training</button>
+      <button class="tab" onclick="showTab('tips')">Tips & Best Practices</button>
+    </div>
+
+    <div class="content">
+      <!-- Overview Tab -->
+      <div class="tab-content active" id="overview">
+        <h2>Welcome to Multi-File Analysis</h2>
+
+        <p style="font-size: 1.1em; color: var(--ga-blue); margin-bottom: 2rem;">
+          The Variance tab enables you to analyze and link multiple data files together.
+          Whether you're comparing budgets to actuals or merging customer data with sales records,
+          you can work with up to 4 files simultaneously.
+        </p>
+
+        <h3>What's New</h3>
+
+        <div class="feature-grid">
+          <div class="feature-card">
+            <h4><span class="icon">📁</span> Upload Up to 4 Files</h4>
+            <p>Work with multiple datasets simultaneously. Upload 2-4 Excel/CSV files and analyze them together.</p>
+          </div>
+
+          <div class="feature-card">
+            <h4><span class="icon">🔗</span> Smart Join Suggestions</h4>
+            <p>The system automatically detects matching columns across files and suggests how to link them.</p>
+          </div>
+
+          <div class="feature-card">
+            <h4><span class="icon">⚡</span> Automatic Mode Detection</h4>
+            <p>Variance mode for same-structure comparisons, Linking mode for different structures. The system chooses automatically.</p>
+          </div>
+
+          <div class="feature-card">
+            <h4><span class="icon">🎯</span> One-Click Accept</h4>
+            <p>Review suggested joins and accept with a single click. Easy configuration panel for manual adjustments.</p>
+          </div>
+        </div>
+
+        <div class="success-box">
+          <strong>✓ Backward Compatible:</strong> All existing 2-file variance workflows continue to work exactly as before.
+        </div>
+      </div>
+
+      <!-- Interface Guide Tab -->
+      <div class="tab-content" id="interface">
+        <h2>Understanding the Interface</h2>
+
+        <h3>File Upload Sections</h3>
+
+        <div class="step-box">
+          <h4><span class="step-number">1</span> FILE 1 through FILE 4</h4>
+          <p>Generic file slots that can hold any dataset. You can customize the labels (e.g., "Budget 2024", "Actuals Q1").</p>
+          <ul>
+            <li>Click or drag files to upload</li>
+            <li>Supported formats: Excel (.xlsx, .xls), CSV</li>
+            <li>Maximum file size: 50MB per file</li>
+            <li>Minimum 2 files required to ask questions</li>
+          </ul>
+        </div>
+
+        <h3>Smart Join Suggestions</h3>
+
+        <div class="step-box">
+          <p>After uploading files, the system analyzes columns and suggests potential joins:</p>
+          <ul>
+            <li><strong>High confidence:</strong> Column names match exactly (e.g., "CustomerID" in both files)</li>
+            <li><strong>Medium confidence:</strong> Similar names (e.g., "CustID" and "CustomerID")</li>
+            <li><strong>Value overlap shown:</strong> "95% of values match" indicates good join quality</li>
+          </ul>
+          <p><strong>Actions:</strong></p>
+          <ul>
+            <li><strong>✓ Use this join</strong> - Accept and save the suggestion</li>
+            <li><strong>✗ Reject</strong> - Dismiss this suggestion</li>
+          </ul>
+        </div>
+
+        <h3>Comparison Configuration Panel</h3>
+
+        <div class="step-box">
+          <p>Shows current status and allows manual control:</p>
+          <ul>
+            <li><strong>Uploaded Files:</strong> List of all loaded files</li>
+            <li><strong>Active Joins:</strong> Accepted join relationships</li>
+            <li><strong>Analysis Mode:</strong> Variance or Linking (auto-detected)</li>
+            <li><strong>Manual Mode:</strong> Override auto-detection if needed</li>
+          </ul>
+        </div>
+
+        <h3>Quick Data Exploration Buttons</h3>
+
+        <div class="step-box">
+          <p>Pre-configured questions that auto-execute when clicked:</p>
+          <ul>
+            <li><strong>List Columns/Joins:</strong> Shows available columns and active join relationships</li>
+            <li><strong>Sample Data:</strong> Displays first 5 rows from each file</li>
+            <li><strong>Record Counts:</strong> Shows row counts for each file and after joining</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Key Features Tab -->
+      <div class="tab-content" id="features">
+        <h2>Key Features</h2>
+
+        <h3>1. Multi-File Upload (2-4 Files)</h3>
+
+        <div class="info-box">
+          <p><strong>Use cases:</strong></p>
+          <ul>
+            <li>Traditional variance: Budget vs Actuals (2 files, same structure)</li>
+            <li>Multi-file linking: Customers + Sales + Products (3 files, different structures)</li>
+            <li>Quarterly comparisons: Q1, Q2, Q3, Q4 data (4 files)</li>
+          </ul>
+        </div>
+
+        <h3>2. Smart Join Detection</h3>
+
+        <div class="step-box">
+          <p><strong>How it works:</strong></p>
+          <ul>
+            <li>System analyzes column names across all files</li>
+            <li>Uses fuzzy matching to find similar names</li>
+            <li>Checks value overlap (how many IDs actually match)</li>
+            <li>Prioritizes ID/Code columns for suggestions</li>
+            <li>Ranks suggestions by confidence</li>
+          </ul>
+
+          <p><strong>Example suggestion:</strong></p>
+          <code>
+            File 1 'CustomerID' ↔ File 2 'CustomerID'<br>
+            Confidence: High | Value overlap: 98%
+          </code>
+        </div>
+
+        <h3>3. Automatic Mode Detection</h3>
+
+        <div class="step-box">
+          <h4>Variance Mode</h4>
+          <p>Activated when:</p>
+          <ul>
+            <li>Only 2 files uploaded</li>
+            <li>Schemas are 80%+ similar</li>
+            <li>No explicit join hints</li>
+          </ul>
+          <p><strong>Focus:</strong> Comparing values across same-structure files (variance calculations)</p>
+        </div>
+
+        <div class="step-box">
+          <h4>Linking Mode</h4>
+          <p>Activated when:</p>
+          <ul>
+            <li>3 or 4 files uploaded</li>
+            <li>OR 2 files with different schemas</li>
+            <li>OR explicit join hints provided</li>
+          </ul>
+          <p><strong>Focus:</strong> Merging different datasets via join operations</p>
+        </div>
+
+        <h3>4. Natural Language Joins</h3>
+
+        <div class="step-box">
+          <p>If no auto-suggestions appear, specify joins in your question:</p>
+          <ul>
+            <li>"Link File 1 CustomerID to File 2 CustID"</li>
+            <li>"Join on AccountNum to AcctID"</li>
+            <li>"CustomerID = CustID"</li>
+          </ul>
+          <p>The system parses these patterns and applies the joins automatically.</p>
+        </div>
+
+        <h3>5. Conditional Formatting in Excel Exports</h3>
+
+        <div class="info-box">
+          <p>When you export results to Excel, conditional formatting is applied based on the analysis:</p>
+          <ul>
+            <li><strong>Top/Bottom values:</strong> Highlighted in green/red</li>
+            <li><strong>Variance thresholds:</strong> Over budget shown in red</li>
+            <li><strong>Null checks:</strong> Missing values highlighted</li>
+            <li><strong>Date ranges:</strong> Current period highlighted</li>
+            <li><strong>Cross-column rules:</strong> Budget vs Actual comparisons</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Hands-On Training Tab -->
+      <div class="tab-content" id="training">
+        <h2>Hands-On Training</h2>
+
+        <h3>Exercise 1: Traditional Variance (2 Files, Same Structure)</h3>
+
+        <div class="step-box">
+          <p><span class="step-number">1</span> <strong>Upload Files:</strong></p>
+          <ul>
+            <li>File 1: Label as "Budget 2024", upload your budget file</li>
+            <li>File 2: Label as "Actuals 2024", upload your actuals file</li>
+          </ul>
+        </div>
+
+        <div class="step-box">
+          <p><span class="step-number">2</span> <strong>System Behavior:</strong></p>
+          <ul>
+            <li>Detects Variance mode (schemas 80%+ similar)</li>
+            <li>No join suggestions appear (not needed for same structure)</li>
+            <li>Ready to ask questions immediately</li>
+          </ul>
+        </div>
+
+        <div class="step-box">
+          <p><span class="step-number">3</span> <strong>Sample Questions:</strong></p>
+          <ul>
+            <li>"Compare Budget 2024 to Actuals 2024: which departments are over budget?"</li>
+            <li>"Show variance percentages by category"</li>
+            <li>"Highlight departments over budget by more than 10%"</li>
+          </ul>
+        </div>
+
+        <h3>Exercise 2: Multi-File Linking (3 Files, Different Structures)</h3>
+
+        <div class="step-box">
+          <p><span class="step-number">1</span> <strong>Upload Files:</strong></p>
+          <ul>
+            <li>File 1: Customers (columns: CustomerID, Name, Region)</li>
+            <li>File 2: Sales (columns: OrderID, CustomerID, Amount)</li>
+            <li>File 3: Products (columns: ProductID, ProductName, Category)</li>
+          </ul>
+        </div>
+
+        <div class="step-box">
+          <p><span class="step-number">2</span> <strong>Review Suggestions:</strong></p>
+          <ul>
+            <li>Suggestion 1: File 1 'CustomerID' ↔ File 2 'CustomerID' (100% match)</li>
+            <li>Suggestion 2: File 2 'ProductID' ↔ File 3 'ProductID' (95% match)</li>
+          </ul>
+        </div>
+
+        <div class="step-box">
+          <p><span class="step-number">3</span> <strong>Accept Joins:</strong></p>
+          <ul>
+            <li>Click "✓ Use this join" for both suggestions</li>
+            <li>Comparison Configuration panel auto-expands</li>
+            <li>Verify joins appear in "Active Joins" list</li>
+          </ul>
+        </div>
+
+        <div class="step-box">
+          <p><span class="step-number">4</span> <strong>Sample Questions:</strong></p>
+          <ul>
+            <li>"Show total revenue by customer region"</li>
+            <li>"Which product category generates the most sales?"</li>
+            <li>"List top 10 customers with their purchase history"</li>
+          </ul>
+        </div>
+
+        <h3>Exercise 3: Manual Join Specification</h3>
+
+        <div class="step-box">
+          <p><span class="step-number">1</span> <strong>Scenario:</strong></p>
+          <p>Two files with non-matching column names:</p>
+          <ul>
+            <li>File 1: System1 data (AccountNum, Data...)</li>
+            <li>File 2: System2 data (AcctID, Data...)</li>
+          </ul>
+        </div>
+
+        <div class="step-box">
+          <p><span class="step-number">2</span> <strong>No Auto-Suggestion:</strong></p>
+          <p>Column names too different for auto-detection</p>
+        </div>
+
+        <div class="step-box">
+          <p><span class="step-number">3</span> <strong>Specify in Question:</strong></p>
+          <code>"Link File 1 AccountNum to File 2 AcctID. Show summary."</code>
+          <p>System parses the join hint and applies it automatically.</p>
+        </div>
+      </div>
+
+      <!-- Tips & Best Practices Tab -->
+      <div class="tab-content" id="tips">
+        <h2>Tips & Best Practices</h2>
+
+        <h3>File Preparation</h3>
+
+        <div class="highlight-box">
+          <strong>⚠ Data Quality Tips:</strong>
+          <ul>
+            <li><strong>Clean column names:</strong> Remove spaces, special characters before upload</li>
+            <li><strong>Consistent formats:</strong> Dates, numbers should use same format across files</li>
+            <li><strong>ID columns:</strong> Make sure join keys have matching values (not just names)</li>
+            <li><strong>Remove duplicates:</strong> Duplicate IDs can cause incorrect join results</li>
+          </ul>
+        </div>
+
+        <h3>When to Use Each Mode</h3>
+
+        <div class="info-box">
+          <p><strong>Use Variance Mode for:</strong></p>
+          <ul>
+            <li>Budget vs Actuals comparisons</li>
+            <li>Period-over-period analysis (This Year vs Last Year)</li>
+            <li>Forecast vs Actual tracking</li>
+            <li>Any scenario where structures are identical</li>
+          </ul>
+        </div>
+
+        <div class="info-box">
+          <p><strong>Use Linking Mode for:</strong></p>
+          <ul>
+            <li>Master data enrichment (Customers + Transactions)</li>
+            <li>Multi-system integration (CRM + ERP data)</li>
+            <li>Hierarchical data (Departments + Employees + Projects)</li>
+            <li>Any scenario where schemas differ</li>
+          </ul>
+        </div>
+
+        <h3>Common Scenarios</h3>
+
+        <div class="step-box">
+          <h4>Scenario 1: Budget vs Actuals Analysis</h4>
+          <p><strong>Files:</strong> Budget Q1, Actuals Q1 (same structure)</p>
+          <p><strong>Mode:</strong> Auto-detects Variance (80%+ similar)</p>
+          <p><strong>Questions to Ask:</strong></p>
+          <ul>
+            <li>"Compare Budget Q1 to Actuals Q1: which departments are over budget?"</li>
+            <li>"Show variance percentages by category"</li>
+            <li>"Highlight departments over budget by more than 10%"</li>
+          </ul>
+        </div>
+
+        <div class="step-box">
+          <h4>Scenario 2: Customer Sales Analysis</h4>
+          <p><strong>Files:</strong> Customers, Sales, Products (different structures)</p>
+          <p><strong>Mode:</strong> Linking (accept CustomerID and ProductCode joins)</p>
+          <p><strong>Questions to Ask:</strong></p>
+          <ul>
+            <li>"Show total revenue by customer region"</li>
+            <li>"Which product category generates the most sales?"</li>
+            <li>"List top 10 customers with their purchase history"</li>
+          </ul>
+        </div>
+
+        <div class="step-box">
+          <h4>Scenario 3: Multi-Period Comparison</h4>
+          <p><strong>Files:</strong> Q1, Q2, Q3, Q4 sales data</p>
+          <p><strong>Mode:</strong> Linking (to merge all quarters)</p>
+          <p><strong>Questions to Ask:</strong></p>
+          <ul>
+            <li>"Show total sales by quarter"</li>
+            <li>"Which quarter had the highest growth?"</li>
+            <li>"Compare Q1 to Q4: what changed?"</li>
+          </ul>
+        </div>
+
+        <h3>Troubleshooting</h3>
+
+        <div class="highlight-box">
+          <strong>If joins aren't suggested:</strong>
+          <ul>
+            <li>Check column names - are they similar enough?</li>
+            <li>Verify value overlap - do IDs actually match?</li>
+            <li>Use natural language joins in your question</li>
+            <li>Consider manual mode if needed</li>
+          </ul>
+        </div>
+
+        <div class="highlight-box">
+          <strong>If wrong mode is detected:</strong>
+          <ul>
+            <li>Enable "Manual Mode" in Comparison Configuration panel</li>
+            <li>Select desired mode (Variance or Linking)</li>
+            <li>System will respect your choice</li>
+          </ul>
+        </div>
+
+        <div class="highlight-box">
+          <strong>If questions fail:</strong>
+          <ul>
+            <li>Ensure minimum 2 files are uploaded</li>
+            <li>Verify joins are accepted (check Active Joins list)</li>
+            <li>Try simpler questions first to test connectivity</li>
+            <li>Check file uploads completed successfully</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p><strong>General Atomics Aeronautical Systems, Inc.</strong></p>
+      <p>Chat with Data - Variance Tab Training Guide | Version 2.0</p>
+      <p style="margin-top: 1rem; opacity: 0.7;">
+        For support or questions, contact your IT administrator
+      </p>
+      <p style="margin-top: 0.5rem; font-size: 0.85em; opacity: 0.6;">
+        Generated: August 2026 | Internal Use Only
+      </p>
+    </div>
+  </div>
+
+  <script>
+    function showTab(tabId) {
+      // Hide all tab contents
+      document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+      });
+
+      // Show selected tab content
+      document.getElementById(tabId).classList.add('active');
+
+      // Update tab styling
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      event.target.classList.add('active');
+
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  </script>
+</body>
+</html>
