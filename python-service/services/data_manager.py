@@ -93,6 +93,50 @@ class SessionData:
             self.history_msproject = []
         self.last_result = None
 
+    def clear_files_and_history(self, mode: str):
+        """Clear both files and chat history for specific mode."""
+        if mode == "standard":
+            # Clear standard mode data
+            self.df = None
+            self.schema = None
+            self.filename = None
+            self.history_standard = []
+        elif mode == "variance":
+            # Clear variance mode data
+            self.df_a = None
+            self.df_b = None
+            self.df_c = None
+            self.df_d = None
+            self.schema_a = None
+            self.schema_b = None
+            self.schema_c = None
+            self.schema_d = None
+            self.join_hints = []
+            self.manual_mode = None
+            self.history_variance = []
+            # Reset labels to defaults
+            self.label_a = "File 1"
+            self.label_b = "File 2"
+            self.label_c = "File 3"
+            self.label_d = "File 4"
+        elif mode == "msproject":
+            # Clear MS Project mode data
+            self.df_tasks = None
+            self.df_resources = None
+            self.df_assignments = None
+            self.df_earned_value = None
+            self.schema_tasks = None
+            self.schema_resources = None
+            self.schema_assignments = None
+            self.schema_earned_value = None
+            self.montecarlo_result = None
+            self.narrative_text = None
+            self.narrative_filename = None
+            self.history_msproject = []
+
+        # Clear last_result regardless of mode
+        self.last_result = None
+
     def clear(self):
         """Full reset - clears everything including file data."""
         self.__init__()

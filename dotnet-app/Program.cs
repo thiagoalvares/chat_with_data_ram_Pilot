@@ -243,6 +243,7 @@ dataEndpoints.Add(app.MapPost("/variance/remove_join", (HttpContext ctx, IHttpCl
 dataEndpoints.Add(app.MapPost("/variance/set_mode", (HttpContext ctx, IHttpClientFactory f) => ProxyJson(ctx, f, "/api/variance/set_mode")));
 dataEndpoints.Add(app.MapGet("/variance/get_joins", (HttpContext ctx, IHttpClientFactory f) => ProxyGet(ctx, f, "/api/variance/get_joins")));
 dataEndpoints.Add(app.MapPost("/clear", (HttpContext ctx, IHttpClientFactory f) => ProxyJson(ctx, f, "/api/clear")));
+dataEndpoints.Add(app.MapPost("/clear_all", (HttpContext ctx, IHttpClientFactory f) => ProxyJson(ctx, f, "/api/clear_all")));
 dataEndpoints.Add(app.MapPost("/export/conversation", (HttpContext ctx, IHttpClientFactory f) => ProxyJson(ctx, f, "/api/export/conversation")));
 
 // ── Proxy: file downloads (GET) ──────────────────────────────────────────────────

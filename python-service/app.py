@@ -931,6 +931,18 @@ def clear():
     return jsonify({"ok": True})
 
 
+@api.route("/clear_all", methods=["POST"])
+def clear_all():
+    """Clear both files and chat history for a specific mode (tab)."""
+    sid  = _sid()
+    sess = get_session(sid)
+    mode = (request.get_json() or {}).get("mode")
+    sess.clear_files_and_history(mode)
+    save_session(sid, sess)
+    logger.info(f"Files and chat history cleared | sid={sid} | mode={mode}")
+    return jsonify({"ok": True})
+
+
 # ── Export (verbatim from prototype export.py) ────────────────────────────────
 
 def _convert_to_dataframe(raw_result) -> pd.DataFrame:

@@ -1048,6 +1048,7 @@
         <button class="icon-btn" onclick="showSettingsModal()" title="Settings (API key)">⚙</button>
         <button class="icon-btn" id="admin-btn" onclick="showAdminDashboard()" title="Admin dashboard" style="display:none">🛡</button>
         <button class="btn-ghost" onclick="clearChat()" title="Clear the current conversation (option to export first)">Clear Chat</button>
+        <button class="btn-ghost" onclick="clearAll()" title="Clear both files and conversation for this tab (option to export first)">Clear All</button>
       </div>
     </div>
 
@@ -2376,6 +2377,70 @@ async function clearChat() {
   });
   transcripts[currentMode] = [];
   renderTranscript(currentMode);
+}
+
+async function clearAll() {
+  // Clear both files and chat history for current tab
+  const hasAnswers = transcripts[currentMode].some(e => e.role === 'assistant' && !e.error);
+  if (hasAnswers && confirm('Export this conversation to Word before clearing everything?')) {
+    await exportConversation();
+  }
+
+  // Call new API endpoint
+  await fetch('/clear_all', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode: currentMode })
+  });
+
+  // Clear frontend transcript state
+  transcripts[currentMode] = [];
+  renderTranscript(currentMode);
+
+  // Reset UI based on mode
+  if (currentMode === 'standard') {
+    varLoaded.standard = false;
+    const status = document.getElementById('status-standard');
+    if (status) status.style.display = 'none';
+
+    // Clear profile card
+    const profileSection = document.getElementById('profile-section');
+    if (profileSection) profileSection.style.display = 'none';
+
+    // Clear schema pills
+    const schemaDiv = document.getElementById('schema-standard');
+    if (schemaDiv) schemaDiv.innerHTML = '';
+
+  } else if (currentMode === 'variance') {
+    varLoaded.a = false;
+    varLoaded.b = false;
+    varLoaded.c = false;
+    varLoaded.d = false;
+
+    // Clear all upload statuses
+    ['status-a', 'status-b', 'status-c', 'status-d'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+
+    // Clear all schema previews
+    ['schema-a', 'schema-b', 'schema-c', 'schema-d'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+
+    // Clear join suggestions
+    const joinDiv = document.getElementById('join-suggestions');
+    if (joinDiv) joinDiv.style.display = 'none';
+
+    // Reset file labels to defaults
+    document.getElementById('label-a').value = 'File 1';
+    document.getElementById('label-b').value = 'File 2';
+    document.getElementById('label-c').value = 'File 3';
+    document.getElementById('label-d').value = 'File 4';
+  }
+
+  updateModeReadiness();
 }
 
 function setupDragDrop(zoneId, inputId) {
