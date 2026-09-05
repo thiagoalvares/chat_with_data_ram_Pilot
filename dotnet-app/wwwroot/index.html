@@ -1739,6 +1739,11 @@ function positionTourCallouts(mode) {
         break;
     }
 
+    // Manual adjustment for Track Usage callout (number 3) - shift left
+    if (tour.number === 3) {
+      left = left - 80;
+    }
+
     callout.style.top = `${top}px`;
     callout.style.left = `${left}px`;
   });
