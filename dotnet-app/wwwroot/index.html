@@ -1054,7 +1054,7 @@
 
     <div class="chat-body" id="chat-body">
       <div class="empty-state" id="empty-state">
-        <div class="empty-text">Use the Left Panel to upload a file and the chat below to start asking questions</div>
+        <div class="empty-text">Upload a file using the panel on the left, then ask questions below.</div>
       </div>
     </div>
 
@@ -1494,7 +1494,7 @@ function renderTranscript(mode) {
     e.id = 'empty-state';
     e.innerHTML = modeReady[mode]
       ? `<div class="empty-icon">💬</div><div class="empty-text">Ask a question about your data</div><div class="empty-sub">Try a suggestion above, or type below</div>`
-      : `<div class="empty-text">Use the Left Panel to upload a file and the chat below to start asking questions</div>`;
+      : `<div class="empty-text">Upload a file using the panel on the left, then ask questions below.</div>`;
     body.appendChild(e);
     return;
   }
