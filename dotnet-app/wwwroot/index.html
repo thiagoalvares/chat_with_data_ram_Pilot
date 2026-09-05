@@ -1647,12 +1647,25 @@ function positionTourCallouts(mode) {
     });
   }
 
-  // Tour 2: Usage button
-  const usageBtn = document.querySelector('[onclick="showUsageDashboard()"]');
+  // Tour 2: Dashboard View tab
+  const dashTab = document.getElementById('view-tab-dash');
+  if (dashTab) {
+    tours.push({
+      target: dashTab,
+      number: 2,
+      title: 'Dashboard View',
+      desc: 'View pinned visuals. Pin your visuals and see them here together',
+      arrow: 'up',
+      position: 'below'
+    });
+  }
+
+  // Tour 3: Usage button (📊) - be specific with title attribute
+  const usageBtn = document.querySelector('[title="My usage"]');
   if (usageBtn) {
     tours.push({
       target: usageBtn,
-      number: 2,
+      number: 3,
       title: 'Track Usage',
       desc: 'View your API usage, costs, and set your LiteLLM key',
       arrow: 'up',
@@ -1660,12 +1673,12 @@ function positionTourCallouts(mode) {
     });
   }
 
-  // Tour 3: Clear All button
+  // Tour 4: Clear All button
   const clearAllBtn = document.querySelector('[onclick="clearAll()"]');
   if (clearAllBtn) {
     tours.push({
       target: clearAllBtn,
-      number: 3,
+      number: 4,
       title: 'Reset',
       desc: '<strong>Clear Chat</strong> keeps files<br><strong>Clear All</strong> removes everything',
       arrow: 'up',
@@ -1673,12 +1686,12 @@ function positionTourCallouts(mode) {
     });
   }
 
-  // Tour 4: Input area
-  const inputArea = document.querySelector('textarea');
+  // Tour 5: Input area
+  const inputArea = document.querySelector('.input-area textarea');
   if (inputArea) {
     tours.push({
       target: inputArea,
-      number: 4,
+      number: 5,
       title: 'Ask Questions',
       desc: 'Type natural language questions about your data—no coding needed',
       arrow: 'down',
