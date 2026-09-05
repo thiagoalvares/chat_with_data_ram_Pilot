@@ -177,10 +177,10 @@
     .slot-badge.empty { background: var(--bg3); color: var(--silver); }
 
     .upload-zone { border: 1.5px dashed var(--border2); border-radius: 6px; padding: 0.9rem; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; position: relative; background: var(--bg); }
-    .upload-zone:hover, .upload-zone.drag-over { border-color: var(--navy-mid); background: var(--navy-light); }
+    .upload-zone:hover, .upload-zone.drag-over { border-color: #4A9FD8; background: #E3F2FD; }
     .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
     .upload-icon { font-size: 1.1rem; margin-bottom: 0.25rem; }
-    .upload-text { font-size: 0.68rem; color: var(--silver); font-weight: 500; }
+    .upload-text { font-size: 0.74rem; color: var(--silver); font-weight: 500; }
     .upload-status { font-size: 0.68rem; padding: 0.3rem 0.6rem; border-radius: 4px; margin-top: 0.4rem; display: none; font-weight: 500; }
     .upload-status.ok  { color: var(--success); background: rgba(0,135,90,0.08); display: block; }
     .upload-status.err { color: var(--error);   background: rgba(192,57,43,0.08); display: block; }
@@ -320,7 +320,7 @@
 
     .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--silver); gap: 0.8rem; text-align: center; }
     .empty-icon { font-size: 2rem; opacity: 0.4; }
-    .empty-text { font-size: 0.8rem; font-weight: 500; color: var(--silver); }
+    .empty-text { font-size: 1.1rem; font-weight: 500; color: #4A5F7F; line-height: 1.6; max-width: 500px; }
     .empty-sub  { font-size: 0.72rem; color: var(--silver-lt); max-width: 260px; }
 
     /* Messages */
@@ -857,12 +857,12 @@
           <div class="upload-status" id="status-expert"></div>
         </div>
         <div class="sidebar-section">
-          <div class="section-label">Data File</div>
+          <div class="section-label">Upload Data File Here</div>
           <div class="upload-slot">
             <div class="upload-zone" id="zone-standard" title="Upload a CSV or Excel file to analyze (click or drag and drop)">
               <input type="file" id="file-standard" accept=".csv,.xlsx,.xls"/>
               <div class="upload-icon">📂</div>
-              <div class="upload-text">CSV or XLSX — drop or click</div>
+              <div class="upload-text">CSV or XLSX — drop or click here</div>
             </div>
             <div class="upload-status" id="status-standard"></div>
           </div>
@@ -884,53 +884,53 @@
       <!-- Variance mode -->
       <div class="mode-panel" id="panel-variance">
         <div class="sidebar-section">
-          <div class="section-label">FILE 1</div>
+          <div class="section-label">Upload File 1</div>
           <div class="upload-slot">
             <input class="label-input" id="label-a" type="text" placeholder="e.g., Budget 2024, Customers" value="File 1" title="Enter a custom label for this dataset"/>
             <div class="slot-hint" id="hint-a" style="display:none"></div>
             <div class="upload-zone" id="zone-a" title="Upload your first dataset">
               <input type="file" id="file-a" accept=".csv,.xlsx,.xls"/>
               <div class="upload-icon">📂</div>
-              <div class="upload-text">CSV or XLSX</div>
+              <div class="upload-text">CSV or XLSX — drop or click here</div>
             </div>
             <div class="upload-status" id="status-a"></div>
           </div>
         </div>
         <div class="sidebar-section">
-          <div class="section-label">FILE 2</div>
+          <div class="section-label">Upload File 2</div>
           <div class="upload-slot">
             <input class="label-input" id="label-b" type="text" placeholder="e.g., Actuals 2025, Sales" value="File 2" title="Enter a custom label for this dataset"/>
             <div class="slot-hint" id="hint-b" style="display:none"></div>
             <div class="upload-zone" id="zone-b" title="Upload your second dataset">
               <input type="file" id="file-b" accept=".csv,.xlsx,.xls"/>
               <div class="upload-icon">📂</div>
-              <div class="upload-text">CSV or XLSX</div>
+              <div class="upload-text">CSV or XLSX — drop or click here</div>
             </div>
             <div class="upload-status" id="status-b"></div>
           </div>
         </div>
         <div class="sidebar-section">
-          <div class="section-label">FILE 3 (Optional)</div>
+          <div class="section-label">Upload File 3 (Optional)</div>
           <div class="upload-slot">
             <input class="label-input" id="label-c" type="text" placeholder="e.g., Forecast 2025, Products" value="File 3" title="Enter a custom label for this dataset"/>
             <div class="slot-hint" id="hint-c" style="display:none"></div>
             <div class="upload-zone" id="zone-c" title="Upload your third dataset (optional)">
               <input type="file" id="file-c" accept=".csv,.xlsx,.xls"/>
               <div class="upload-icon">📂</div>
-              <div class="upload-text">CSV or XLSX</div>
+              <div class="upload-text">CSV or XLSX — drop or click here</div>
             </div>
             <div class="upload-status" id="status-c"></div>
           </div>
         </div>
         <div class="sidebar-section">
-          <div class="section-label">FILE 4 (Optional)</div>
+          <div class="section-label">Upload File 4 (Optional)</div>
           <div class="upload-slot">
             <input class="label-input" id="label-d" type="text" placeholder="e.g., Target 2025, Orders" value="File 4" title="Enter a custom label for this dataset"/>
             <div class="slot-hint" id="hint-d" style="display:none"></div>
             <div class="upload-zone" id="zone-d" title="Upload your fourth dataset (optional)">
               <input type="file" id="file-d" accept=".csv,.xlsx,.xls"/>
               <div class="upload-icon">📂</div>
-              <div class="upload-text">CSV or XLSX</div>
+              <div class="upload-text">CSV or XLSX — drop or click here</div>
             </div>
             <div class="upload-status" id="status-d"></div>
           </div>
@@ -1053,9 +1053,7 @@
 
     <div class="chat-body" id="chat-body">
       <div class="empty-state" id="empty-state">
-        <div class="empty-icon">◈</div>
-        <div class="empty-text">Upload a file to begin</div>
-        <div class="empty-sub">Select a mode and upload your data to start asking questions</div>
+        <div class="empty-text">Use the Left Panel to upload a file and the chat below to start asking questions</div>
       </div>
     </div>
 
@@ -1495,7 +1493,7 @@ function renderTranscript(mode) {
     e.id = 'empty-state';
     e.innerHTML = modeReady[mode]
       ? `<div class="empty-icon">💬</div><div class="empty-text">Ask a question about your data</div><div class="empty-sub">Try a suggestion above, or type below</div>`
-      : `<div class="empty-icon">◈</div><div class="empty-text">Upload a file to begin</div><div class="empty-sub">${mode === 'variance' ? 'Upload both datasets to start comparing' : 'Upload your data to start asking questions'}</div>`;
+      : `<div class="empty-text">Use the Left Panel to upload a file and the chat below to start asking questions</div>`;
     body.appendChild(e);
     return;
   }
