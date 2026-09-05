@@ -318,7 +318,7 @@
     /* Chat */
     .chat-body { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.2rem; }
 
-    .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--silver); gap: 0.8rem; text-align: center; position: relative; }
+    .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--silver); gap: 0.8rem; text-align: center; }
     .empty-icon { font-size: 3rem; opacity: 0.7; margin-bottom: 1rem; }
     .empty-text { font-size: 1.1rem; font-weight: 500; color: #4A5F7F; line-height: 1.6; max-width: 500px; }
     .empty-sub  { font-size: 0.72rem; color: var(--silver-lt); max-width: 260px; }
@@ -327,9 +327,9 @@
     .welcome-title { font-size: 1.4rem; font-weight: 600; color: #1B3A6B; margin-bottom: 0.5rem; }
     .welcome-subtitle { font-size: 1rem; line-height: 1.6; color: #4A5F7F; }
 
-    /* Feature tour callouts */
+    /* Feature tour callouts - positioned via JavaScript */
     .tour-callout {
-      position: absolute;
+      position: fixed;
       background: rgba(255, 255, 255, 0.98);
       border: 2px solid #0F6CBD;
       border-radius: 12px;
@@ -338,7 +338,7 @@
       max-width: 240px;
       font-size: 0.85rem;
       line-height: 1.5;
-      z-index: 100;
+      z-index: 1000;
       animation: fadeInUp 0.5s ease-out;
     }
 
@@ -390,8 +390,8 @@
       border-style: solid;
     }
 
-    /* Arrow pointing left (for sidebar upload) */
-    .tour-1::after {
+    /* Arrow variations */
+    .tour-arrow-left::after {
       border-width: 10px 15px 10px 0;
       border-color: transparent #0F6CBD transparent transparent;
       left: -15px;
@@ -399,9 +399,7 @@
       transform: translateY(-50%);
     }
 
-    /* Arrow pointing up (for top buttons) */
-    .tour-2::after,
-    .tour-3::after {
+    .tour-arrow-up::after {
       border-width: 0 10px 15px 10px;
       border-color: transparent transparent #0F6CBD transparent;
       top: -15px;
@@ -409,8 +407,7 @@
       transform: translateX(-50%);
     }
 
-    /* Arrow pointing down (for input area) */
-    .tour-4::after {
+    .tour-arrow-down::after {
       border-width: 15px 10px 0 10px;
       border-color: #0F6CBD transparent transparent transparent;
       bottom: -15px;
@@ -418,11 +415,13 @@
       transform: translateX(-50%);
     }
 
-    /* Callout positions */
-    .tour-1 { top: 35%; left: 320px; }
-    .tour-2 { top: 70px; right: 290px; }
-    .tour-3 { top: 70px; right: 40px; }
-    .tour-4 { bottom: 110px; left: 50%; transform: translateX(-50%); }
+    .tour-arrow-right::after {
+      border-width: 10px 0 10px 15px;
+      border-color: transparent transparent transparent #0F6CBD;
+      right: -15px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
 
     /* Messages */
     .msg { max-width: 780px; width: 100%; }
@@ -1159,48 +1158,6 @@
         <div class="empty-icon">◈</div>
         <div class="welcome-title">Welcome to Chat with Data</div>
         <div class="welcome-subtitle">Upload a file using the panel on the left, then ask questions below.</div>
-
-        <!-- Feature tour callouts -->
-        <div class="tour-callout tour-1">
-          <div class="tour-title">
-            <span class="tour-number">1</span>
-            Start Here
-          </div>
-          <div class="tour-desc">
-            Upload your CSV or Excel file by clicking or dragging into this zone
-          </div>
-        </div>
-
-        <div class="tour-callout tour-2">
-          <div class="tour-title">
-            <span class="tour-number">2</span>
-            Track Usage
-          </div>
-          <div class="tour-desc">
-            View your API usage, costs, and set your LiteLLM key
-          </div>
-        </div>
-
-        <div class="tour-callout tour-3">
-          <div class="tour-title">
-            <span class="tour-number">3</span>
-            Reset
-          </div>
-          <div class="tour-desc">
-            <strong>Clear Chat</strong> keeps files<br>
-            <strong>Clear All</strong> removes everything
-          </div>
-        </div>
-
-        <div class="tour-callout tour-4">
-          <div class="tour-title">
-            <span class="tour-number">4</span>
-            Ask Questions
-          </div>
-          <div class="tour-desc">
-            Type natural language questions about your data—no coding needed
-          </div>
-        </div>
       </div>
     </div>
 
@@ -1348,6 +1305,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('click', e => {
     if (!e.target.closest('.hist-wrap')) document.getElementById('hist-pop').classList.remove('open');
   });
+
+  // Show tour callouts on initial load if no file uploaded
+  setTimeout(() => {
+    if (!modeReady[currentMode]) {
+      positionTourCallouts(currentMode);
+    }
+  }, 300);
 });
 
 // ── MS Project slot builder ───────────────────────────────────────────────────
@@ -1647,27 +1611,9 @@ function renderTranscript(mode) {
         <div class="empty-icon">◈</div>
         <div class="welcome-title">Welcome to Chat with Data</div>
         <div class="welcome-subtitle">Upload a file using the panel on the left, then ask questions below.</div>
-
-        <div class="tour-callout tour-1">
-          <div class="tour-title"><span class="tour-number">1</span>Start Here</div>
-          <div class="tour-desc">Upload your CSV or Excel file by clicking or dragging into this zone</div>
-        </div>
-
-        <div class="tour-callout tour-2">
-          <div class="tour-title"><span class="tour-number">2</span>Track Usage</div>
-          <div class="tour-desc">View your API usage, costs, and set your LiteLLM key</div>
-        </div>
-
-        <div class="tour-callout tour-3">
-          <div class="tour-title"><span class="tour-number">3</span>Reset</div>
-          <div class="tour-desc"><strong>Clear Chat</strong> keeps files<br><strong>Clear All</strong> removes everything</div>
-        </div>
-
-        <div class="tour-callout tour-4">
-          <div class="tour-title"><span class="tour-number">4</span>Ask Questions</div>
-          <div class="tour-desc">Type natural language questions about your data—no coding needed</div>
-        </div>
       `;
+      // Position tour callouts after DOM renders
+      setTimeout(() => positionTourCallouts(mode), 100);
     }
     body.appendChild(e);
     return;
@@ -1676,6 +1622,113 @@ function renderTranscript(mode) {
   const lastAssistantId = [...entries].reverse().find(x => x.role === 'assistant' && !x.error)?.id;
   entries.forEach(en => renderEntry(en, en.id === lastAssistantId));
   body.scrollTop = body.scrollHeight;
+}
+
+function positionTourCallouts(mode) {
+  // Remove any existing tour callouts
+  document.querySelectorAll('.tour-callout').forEach(el => el.remove());
+
+  // Define tour stops based on mode
+  const tours = [];
+
+  // Tour 1: Upload zone (sidebar)
+  const uploadZone = mode === 'standard'
+    ? document.getElementById('zone-standard')
+    : document.getElementById('zone-a');
+
+  if (uploadZone) {
+    tours.push({
+      target: uploadZone,
+      number: 1,
+      title: 'Start Here',
+      desc: 'Upload your CSV or Excel file by clicking or dragging into this zone',
+      arrow: 'left',
+      position: 'right' // callout to the right of target
+    });
+  }
+
+  // Tour 2: Usage button
+  const usageBtn = document.querySelector('[onclick="showUsageDashboard()"]');
+  if (usageBtn) {
+    tours.push({
+      target: usageBtn,
+      number: 2,
+      title: 'Track Usage',
+      desc: 'View your API usage, costs, and set your LiteLLM key',
+      arrow: 'up',
+      position: 'below'
+    });
+  }
+
+  // Tour 3: Clear All button
+  const clearAllBtn = document.querySelector('[onclick="clearAll()"]');
+  if (clearAllBtn) {
+    tours.push({
+      target: clearAllBtn,
+      number: 3,
+      title: 'Reset',
+      desc: '<strong>Clear Chat</strong> keeps files<br><strong>Clear All</strong> removes everything',
+      arrow: 'up',
+      position: 'below'
+    });
+  }
+
+  // Tour 4: Input area
+  const inputArea = document.querySelector('textarea');
+  if (inputArea) {
+    tours.push({
+      target: inputArea,
+      number: 4,
+      title: 'Ask Questions',
+      desc: 'Type natural language questions about your data—no coding needed',
+      arrow: 'down',
+      position: 'above'
+    });
+  }
+
+  // Create and position callouts
+  tours.forEach(tour => {
+    const rect = tour.target.getBoundingClientRect();
+    const callout = document.createElement('div');
+    callout.className = `tour-callout tour-arrow-${tour.arrow}`;
+    callout.innerHTML = `
+      <div class="tour-title">
+        <span class="tour-number">${tour.number}</span>
+        ${tour.title}
+      </div>
+      <div class="tour-desc">${tour.desc}</div>
+    `;
+
+    document.body.appendChild(callout);
+
+    // Get callout dimensions after adding to DOM
+    const calloutRect = callout.getBoundingClientRect();
+
+    // Position based on target and desired placement
+    let top, left;
+
+    switch (tour.position) {
+      case 'right':
+        left = rect.right + 20;
+        top = rect.top + (rect.height / 2) - (calloutRect.height / 2);
+        break;
+      case 'below':
+        left = rect.left + (rect.width / 2) - (calloutRect.width / 2);
+        top = rect.bottom + 20;
+        break;
+      case 'above':
+        left = rect.left + (rect.width / 2) - (calloutRect.width / 2);
+        top = rect.top - calloutRect.height - 20;
+        break;
+      case 'left':
+        left = rect.left - calloutRect.width - 20;
+        top = rect.top + (rect.height / 2) - (calloutRect.height / 2);
+        break;
+    }
+
+    callout.style.top = `${top}px`;
+    callout.style.left = `${left}px`;
+  });
 }
 
 function dismissNudge() {
